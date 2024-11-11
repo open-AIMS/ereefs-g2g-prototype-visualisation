@@ -12,8 +12,8 @@ runs of this script.
 
 This takes about 1 sec per day to download and 6.2 MB per day.
 """
+import sys
 import xarray as xr
-import numpy as np
 import pandas as pd
 import os
 
@@ -28,9 +28,9 @@ end_date = '2022-11-02'
 dates = pd.date_range(start=start_date, end=end_date, freq='D') + pd.Timedelta('14h')
 
 # specify the bounding box
-north = -20.74
-south = -28.31
-west = 148.8
+north = -10.65
+south = -29.30
+west = 142.27
 east = 154
 
 # folder to save the downloaded data to 
@@ -61,7 +61,7 @@ gbr1_depth_to_k_table = {
 
 k = gbr1_depth_to_k_table.get(depth, None)
 if k is None:
-    print(f"Depth {depth_value} not found in the lookup table.")
+    print(f"Depth {depth} not found in the lookup table.")
     sys.exit(1)
 
 if not os.path.exists(destination_folder):

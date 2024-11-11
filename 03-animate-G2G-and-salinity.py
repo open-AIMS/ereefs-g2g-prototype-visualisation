@@ -16,13 +16,9 @@ mpl.use("agg")
 import matplotlib.pyplot as plt
 import matplotlib.patheffects as pe
 import matplotlib.animation as animation
-from matplotlib import cm
-from matplotlib.colors import Normalize, LogNorm
 import geopandas as gpd
-from mpl_toolkits.axes_grid1 import make_axes_locatable
 import cartopy.crs as ccrs
 import matplotlib.colors as colors
-from datetime import datetime
 import matplotlib
 import os
 from shapely.geometry import Point
@@ -66,7 +62,7 @@ for year in range(2016, 2023):
     # Load G2G data
     g2g_root = 'D:/eReefs/eReefs_data_from_BOM/G2G_gridded_test_2015_to_2022/test_gridded_nc'
 
-    g2g_nc_path = f"{g2g_root}/{year_str}/test_grids_{v}_20*.nc"
+    g2g_nc_path = f"{g2g_root}/{year_str}/sidb2netcdf_{v}_20*.nc"
     print(g2g_nc_path)
     
     g2g_ds = xr.open_mfdataset(g2g_nc_path)
@@ -163,8 +159,9 @@ for year in range(2016, 2023):
     # Set the boundary for the colormap and create a BoundaryNorm object
     bounds = np.logspace(np.log10(vmin), np.log10(vmax), cmap.N)
     norm = mpl.colors.BoundaryNorm(bounds, transparent_cmap.N)
-    
-    im = plt.imshow(g2g_d0, cmap=transparent_cmap, norm=norm, extent = extent, zorder=2, transform=ccrs.PlateCarree())
+
+    im = plt.imshow(g2g_d0, cmap=transparent_cmap, norm=norm, extent=extent, zorder=2, transform=ccrs.PlateCarree(),
+                    origin='lower')
     # ============== Plot Salinity ===============
     extent_salt = [lon_min_salt, lon_max_salt, lat_min_salt, lat_max_salt]
     vmin_salt = gbr1_salt.min().values

@@ -1,7 +1,9 @@
-numpy
+numpy==1.26.4
 pandas
 xarray
 matplotlib
 geopandas
 cartopy
 shapely
+netcdf4
+dask
