@@ -16,15 +16,25 @@ import sys
 import xarray as xr
 import pandas as pd
 import os
+import argparse
 
+# Create the argument parser
+parser = argparse.ArgumentParser(description="Download surface (-2.35 m) Salinity (salt) from the GBR1 AIMS eReefs "
+                                             "THREDDS data service.")
 
+# Define parameters (positional or optional)
+parser.add_argument("year", type=str, help="The year for which to download the files.")
+
+# Parse the arguments
+args = parser.parse_args()
+print(f"Downloading daily eReefs Hydro data for the year {args.year} ...")
 
 # specify the URL of the OpenDAP endpoint
 url = 'https://thredds.ereefs.aims.gov.au/thredds/dodsC/gbr1_2.0/daily.nc'
 
 # specify the start and end dates
-start_date = '2016-01-01'
-end_date = '2022-11-02'
+start_date = f"{args.year}-01-01"
+end_date = f"{args.year}-12-31"
 dates = pd.date_range(start=start_date, end=end_date, freq='D') + pd.Timedelta('14h')
 
 # specify the bounding box
