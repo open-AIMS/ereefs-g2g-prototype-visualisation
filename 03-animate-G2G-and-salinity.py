@@ -23,6 +23,7 @@ import matplotlib
 import os
 from shapely.geometry import Point
 import argparse
+from datetime import datetime
 
 # Create the argument parser
 parser = argparse.ArgumentParser(description="Generate a video for a selected year showing both the G2G land run off "
@@ -99,13 +100,13 @@ lon_min_salt, lon_max_salt = gbr1_salt.longitude.min().values, gbr1_salt.longitu
 
 
 # ============= Plot setup =============
-fig, ax = plt.subplots(figsize=(12, 15.5), subplot_kw={'projection': ccrs.PlateCarree()})
-fig.subplots_adjust(left=0.05, right=0.95, bottom=0.05, top=0.94)
+fig, ax = plt.subplots(figsize=(12, 16.5), subplot_kw={'projection': ccrs.PlateCarree()})
+fig.subplots_adjust(left=0.05, right=0.95, bottom=0.08, top=0.94)
 ax.set_aspect('equal')
 
 # ============= Set plot extents =========
 ax.set_extent([min(lon_min,lon_min_salt), max(lon_max,lon_max_salt), 
-    min(lat_min,lat_min_salt), max(lat_max, lat_max_salt)], crs=ccrs.PlateCarree())
+    max(lat_min,lat_min_salt), max(lat_max, lat_max_salt)], crs=ccrs.PlateCarree())
 
 extent = [lon_min, lon_max, lat_min, lat_max]
 
@@ -199,8 +200,8 @@ dates = g2g_data.time.values
 date_str = pd.to_datetime(str(dates[0])).strftime('%Y-%m-%d')
 
 ax_left = ax.get_position().x0
-fig.text(0.5, 0.985, "Land run off", ha="center", va="top", fontsize=24, fontweight="bold")
-fig.text(ax_left, 0.967, "Queensland", ha="left", va="top", fontsize=18)
+fig.text(0.5, 0.985, "River flow and Salinity", ha="center", va="top", fontsize=24, fontweight="bold")
+fig.text(ax_left, 0.964, "Queensland", ha="left", va="top", fontsize=18)
 date_text = ax.text(
     0.5,
     0.99,
@@ -212,9 +213,23 @@ date_text = ax.text(
     path_effects=[pe.withStroke(linewidth=3, foreground="white")],
 )
 
+ax_right = ax.get_position().x1
+fig.text(ax_right, 0.063, f"Variable IDs: {v}, salt", ha="right", va="bottom",
+         fontsize=11, color="gray")
+
+# Metadata in bottom right corner
+today_str = datetime.now().strftime("%d-%b-%Y")
+metadata_text = (
+    f"Data: BOM G2G, eReefs CSIRO GBR1 Hydrodynamic Model v2.0\n"
+    f"Map generation: AIMS {today_str}\n"
+    f"Licensing: Creative Commons Attribution 4.0 International (https://creativecommons.org/licenses/by/4.0/)"
+)
+fig.text(ax_right, 0.020, metadata_text, ha="right", va="bottom",
+         fontsize=10, color="black", linespacing=1.5)
+
 # Create colorbar axes inside the map (axes coordinates: left, bottom, width, height).
-cb_ax1 = ax.inset_axes((0.04, 0.03, 0.030, 0.28))
-cb_ax2 = ax.inset_axes((0.18, 0.03, 0.030, 0.28))
+cb_ax1 = ax.inset_axes((0.04, 0.02, 0.030, 0.28))
+cb_ax2 = ax.inset_axes((0.18, 0.02, 0.030, 0.28))
 
 # 🔹 Add vertical colorbars
 cb1 = fig.colorbar(im_river_flow, cax=cb_ax1, orientation="vertical")
