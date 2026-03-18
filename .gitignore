@@ -2,3 +2,6 @@ src-data/
 export/*
 !export/readme.md
 test.log
+.idea
+.vscode
+.history
