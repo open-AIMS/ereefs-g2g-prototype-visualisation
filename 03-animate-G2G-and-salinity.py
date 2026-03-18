@@ -1,5 +1,5 @@
 """
-Eric Lawrey - Australian Institute of Marine Science
+Eric Lawrey, Marc Hammerton - Australian Institute of Marine Science
 This script generates a video for each year showing both the G2G land run off
 data and the eReefs GBR1 Hydro salinity data. These videos are intended as a
 prototype of this visualisation. The GBR1 Hydro data needed for this visualisations
@@ -57,11 +57,6 @@ name = f"G2G-GBR1-Hydro-v2.0-Salt_{year_str}"
 video_file = os.path.join(export, f"{name}.mp4")
 video_file_tmp = os.path.join(export, f"{name}.tmp.mp4")
 
-# Support cancellations and restarts
-if os.path.exists(video_file):
-    print(f'Skipping video for {year} as {video_file} already exists')
-    sys.exit(0)
-
 # Clean up any temp files left over from previous runs
 if os.path.exists(video_file_tmp):
     print('Removing temporary file')
@@ -104,8 +99,8 @@ lon_min_salt, lon_max_salt = gbr1_salt.longitude.min().values, gbr1_salt.longitu
 
 
 # ============= Plot setup =============
-fig, ax = plt.subplots(figsize=(12, 14.5), subplot_kw={'projection': ccrs.PlateCarree()})
-fig.subplots_adjust(left=0.05, right=0.95, bottom=0.05, top=0.95)
+fig, ax = plt.subplots(figsize=(12, 15.5), subplot_kw={'projection': ccrs.PlateCarree()})
+fig.subplots_adjust(left=0.05, right=0.95, bottom=0.05, top=0.94)
 ax.set_aspect('equal')
 
 # ============= Set plot extents =========
@@ -131,7 +126,7 @@ cities['geometry'] = cities.apply(lambda row: Point(row['longitude'], row['latit
 cities_gdf = gpd.GeoDataFrame(cities)
 # Convert ereefs_scale to numeric, replacing errors with np.nan
 cities_gdf['ereefs_scale'] = pd.to_numeric(cities_gdf['ereefs_scale'], errors='coerce')
-cities_gdf_filtered = cities_gdf[cities_gdf['ereefs_scale'] <= 2]
+cities_gdf_filtered = cities_gdf[cities_gdf['ereefs_scale'] <= 1]
 # Limit the cities to those that are on the plot (otherwise it draws cities
 # outside the plot)
 minx, maxx, miny, maxy = ax.get_extent()
@@ -173,8 +168,8 @@ transparent_cmap = mpl.colors.ListedColormap(colors_ramp)
 bounds = np.logspace(np.log10(vmin), np.log10(vmax), cmap.N)
 norm = mpl.colors.BoundaryNorm(bounds, transparent_cmap.N)
 
-im = plt.imshow(g2g_d0, cmap=transparent_cmap, norm=norm, extent=extent, zorder=2, transform=ccrs.PlateCarree(),
-                origin='lower')
+im_river_flow = plt.imshow(g2g_d0, cmap=transparent_cmap, norm=norm, extent=extent, zorder=2, transform=ccrs.PlateCarree(),
+                           origin='lower')
 # ============== Plot Salinity ===============
 extent_salt = [lon_min_salt, lon_max_salt, lat_min_salt, lat_max_salt]
 vmin_salt = gbr1_salt.min().values
@@ -203,13 +198,40 @@ im_salt = plt.imshow(gbr1_salt[0].values, cmap=salt_cmap, vmin=vmin_salt, vmax=v
 dates = g2g_data.time.values
 date_str = pd.to_datetime(str(dates[0])).strftime('%Y-%m-%d')
 
-plt.title(date_str, fontsize=24)
+ax_left = ax.get_position().x0
+fig.text(0.5, 0.985, "Land run off", ha="center", va="top", fontsize=24, fontweight="bold")
+fig.text(ax_left, 0.967, "Queensland", ha="left", va="top", fontsize=18)
+date_text = ax.text(
+    0.5,
+    0.99,
+    date_str,
+    transform=ax.transAxes,
+    ha="center",
+    va="top",
+    fontsize=20,
+    path_effects=[pe.withStroke(linewidth=3, foreground="white")],
+)
 
-cbar = plt.colorbar(im, orientation='horizontal', fraction=0.05, pad=0.05)
-cbar.ax.set_title('Daily flow (m^3/s)', fontsize=14)
-cbar_salt = plt.colorbar(im_salt, orientation='horizontal', fraction=0.05, pad=0.05)
-cbar_salt.ax.set_title('Salinity (PSU)', fontsize=14)
+# Create colorbar axes inside the map (axes coordinates: left, bottom, width, height).
+cb_ax1 = ax.inset_axes((0.04, 0.03, 0.030, 0.28))
+cb_ax2 = ax.inset_axes((0.18, 0.03, 0.030, 0.28))
 
+# 🔹 Add vertical colorbars
+cb1 = fig.colorbar(im_river_flow, cax=cb_ax1, orientation="vertical")
+cb2 = fig.colorbar(im_salt, cax=cb_ax2, orientation="vertical")
+
+# 🔹 Set background color with transparency
+cb_ax1.set_facecolor((1, 1, 1, 0.6))  # Light gray with transparency
+cb_ax2.set_facecolor((1, 1, 1, 0.6))  # Lighter gray with transparency
+
+# 🔹 Customize colorbar labels and ticks
+cb1.set_label("Daily flow (m^3/s)", fontsize=12, fontweight="bold")
+cb2.set_label("Salinity (PSU)", fontsize=12, fontweight="bold")
+
+cb1.ax.yaxis.set_tick_params(labelsize=10)
+cb2.ax.yaxis.set_tick_params(labelsize=10)
+cb1.ax.yaxis.set_label_position("right")
+cb1.ax.yaxis.tick_right()
 
 # ============== Animate the plots ==============
 if animate:
@@ -222,11 +244,11 @@ if animate:
                 message = f'Writing frame {i}/{N} for year {year}\n'
                 f.write(message)
                 sys.stdout.write(message)
-            im.set_array(g2g_data[i].values)
+            date_str_i = pd.to_datetime(str(dates[i])).strftime('%Y-%m-%d')
+            date_text.set_text(date_str_i)
+            im_river_flow.set_array(g2g_data[i].values)
             im_salt.set_array(gbr1_salt[i].values)
-            date_str = pd.to_datetime(str(dates[i])).strftime('%Y-%m-%d')
-            plt.title(date_str, fontsize=22)
-            return [im, im_salt]
+            return [im_river_flow, im_salt, date_text]
         
         anim = animation.FuncAnimation(fig, animate_func, frames=N, interval=1000/fps, blit=True)
         anim.save(video_file_tmp, writer=animation.FFMpegWriter(bitrate=5000))
