@@ -81,7 +81,8 @@ g2g_data_raw = g2g_ds["{}".format(v)]
 
 # Replace -999 vals with nan (I thought we already got rid of those?)
 g2g_data_nans = g2g_data_raw.where(g2g_data_raw!=-999.)
-# Accumulate to daily timescale (actually average...)
+
+# Aggregate to daily mean flow (cumecs, m^3/s)
 g2g_data = g2g_data_nans.resample(time='1D', skipna=True).mean(skipna=True)
  
 # Set the extent of the G2G to the extent of the raster data
@@ -144,9 +145,9 @@ for x, y, label in zip(cities_gdf_filtered.geometry.x, cities_gdf_filtered.geome
 # ========== G2G plot ==============
 g2g_d0 = g2g_data[0].values
 
-# Set the limits on the visualisation scale
-vmin = 1
-vmax = 1e3
+# Set the limits on the visualisation scale (cumecs, m^3/s)
+vmin = 1.0
+vmax = 5000.0
 
 # Define the custom color ramp
 color_ramp = np.array([
@@ -169,6 +170,14 @@ transparent_cmap = mpl.colors.ListedColormap(colors_ramp)
 # Set the boundary for the colormap and create a BoundaryNorm object
 bounds = np.logspace(np.log10(vmin), np.log10(vmax), cmap.N)
 norm = mpl.colors.BoundaryNorm(bounds, transparent_cmap.N)
+
+# Build colorbar ticks as 5-only sequence across decades for readability
+ticks = []
+for decade in np.arange(np.floor(np.log10(vmin)), np.ceil(np.log10(vmax)) + 1):
+    scale = 10 ** decade
+    tick_value = 5 * scale
+    if vmin <= tick_value <= vmax:
+        ticks.append(tick_value)
 
 im_river_flow = plt.imshow(g2g_d0, cmap=transparent_cmap, norm=norm, extent=extent, zorder=2, transform=ccrs.PlateCarree(),
                            origin='lower')
@@ -228,14 +237,14 @@ metadata_text = (
     f"Licensing: Creative Commons Attribution 4.0 International (https://creativecommons.org/licenses/by/4.0/)"
 )
 fig.text(ax_left, 0.020, metadata_text, ha="left", va="bottom",
-         fontsize=10, color="black", linespacing=1.5)
+         fontsize=9, color="black", linespacing=1.5)
 
 # Create colorbar axes inside the map (axes coordinates: left, bottom, width, height).
 cb_ax1 = ax.inset_axes((0.04, 0.02, 0.030, 0.28))
 cb_ax2 = ax.inset_axes((0.18, 0.02, 0.030, 0.28))
 
 # 🔹 Add vertical colorbars
-cb1 = fig.colorbar(im_river_flow, cax=cb_ax1, orientation="vertical")
+cb1 = fig.colorbar(im_river_flow, cax=cb_ax1, orientation="vertical", ticks=ticks)
 cb2 = fig.colorbar(im_salt, cax=cb_ax2, orientation="vertical")
 
 # 🔹 Set background color with transparency
@@ -243,13 +252,15 @@ cb_ax1.set_facecolor((1, 1, 1, 0.6))  # Light gray with transparency
 cb_ax2.set_facecolor((1, 1, 1, 0.6))  # Lighter gray with transparency
 
 # 🔹 Customize colorbar labels and ticks
-cb1.set_label("Daily flow (m^3/s)", fontsize=12, fontweight="bold")
+cb1.set_label("Daily Mean River Flow (m^3/s)", fontsize=12, fontweight="bold")
 cb2.set_label("Average Salinity (PSU)", fontsize=12, fontweight="bold")
 
 cb1.ax.yaxis.set_tick_params(labelsize=10)
 cb2.ax.yaxis.set_tick_params(labelsize=10)
 cb1.ax.yaxis.set_label_position("right")
 cb1.ax.yaxis.tick_right()
+cb1.minorticks_off()
+cb1.ax.set_yticklabels([f"{tick:,.0f}" for tick in ticks])
 
 # ============== Animate the plots ==============
 if animate:
