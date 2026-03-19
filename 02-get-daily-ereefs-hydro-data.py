@@ -60,8 +60,8 @@ dates = pd.date_range(start=start_date, end=end_date, freq='D') + pd.Timedelta('
 # specify the bounding box
 north = -10.65
 south = -29.30
-west = 142.27
-east = 154
+west = 141.8
+east = 155.8
 
 # folder to save the downloaded data to 
 destination_folder = os.path.join("src-data", "eReefs-hydro")
