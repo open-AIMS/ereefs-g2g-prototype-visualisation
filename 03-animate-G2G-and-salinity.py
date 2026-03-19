@@ -105,8 +105,9 @@ fig.subplots_adjust(left=0.05, right=0.95, bottom=0.08, top=0.92)
 ax.set_aspect('equal')
 
 # ============= Set plot extents =========
-ax.set_extent([min(lon_min,lon_min_salt), max(lon_max,lon_max_salt), 
+ax.set_extent([max(lon_min,lon_min_salt), max(lon_max,lon_max_salt), 
     max(lat_min,lat_min_salt), max(lat_max, lat_max_salt)], crs=ccrs.PlateCarree())
+# ax.set_extent([141.8, 155.8, -10.65, -29.30], crs=ccrs.PlateCarree())
 
 extent = [lon_min, lon_max, lat_min, lat_max]
 
@@ -200,7 +201,7 @@ dates = g2g_data.time.values
 date_str = pd.to_datetime(str(dates[0])).strftime('%Y-%m-%d')
 
 ax_left = ax.get_position().x0
-fig.text(0.5, 0.978, "River flow and Salinity (-2.35 m)", ha="center", va="top", fontsize=24, fontweight="bold")
+fig.text(0.5, 0.978, "Daily River Flow and Salinity (-2.35 m)", ha="center", va="top", fontsize=24, fontweight="bold")
 fig.text(ax_left, 0.944, "Queensland", ha="left", va="top", fontsize=20)
 date_text = ax.text(
     0.5,
@@ -222,11 +223,11 @@ fig.text(ax_right, 0.063, f"Variable IDs: {v}, salt", ha="right", va="bottom",
 # Metadata in bottom right corner
 today_str = datetime.now().strftime("%d-%b-%Y")
 metadata_text = (
-    f"Data: BOM G2G, eReefs CSIRO GBR4 Hydrodynamic Model v4\n"
     f"Map generation: AIMS {today_str}\n"
+    f"Data: BOM G2G (DOI: <insert DOI here>), eReefs CSIRO GBR4 Hydrodynamic Model v4 (AIMS daily aggregate product, DOI: 10.26274/Y74K-T032)\n"
     f"Licensing: Creative Commons Attribution 4.0 International (https://creativecommons.org/licenses/by/4.0/)"
 )
-fig.text(ax_right, 0.020, metadata_text, ha="right", va="bottom",
+fig.text(ax_left, 0.020, metadata_text, ha="left", va="bottom",
          fontsize=10, color="black", linespacing=1.5)
 
 # Create colorbar axes inside the map (axes coordinates: left, bottom, width, height).
@@ -243,7 +244,7 @@ cb_ax2.set_facecolor((1, 1, 1, 0.6))  # Lighter gray with transparency
 
 # 🔹 Customize colorbar labels and ticks
 cb1.set_label("Daily flow (m^3/s)", fontsize=12, fontweight="bold")
-cb2.set_label("Salinity (PSU)", fontsize=12, fontweight="bold")
+cb2.set_label("Average Salinity (PSU)", fontsize=12, fontweight="bold")
 
 cb1.ax.yaxis.set_tick_params(labelsize=10)
 cb2.ax.yaxis.set_tick_params(labelsize=10)
