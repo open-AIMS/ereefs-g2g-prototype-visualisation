@@ -1,7 +1,7 @@
 """
-Eric Lawrey - Australian Institute of Marine Science
-This script downloads surface (-2.35 m) Salinity (salt) from the GBR1 AIMS
-eReefs THREDDs data service. The data is cropped to the specified bounding
+Eric Lawrey, Marc Hammerton - Australian Institute of Marine Science
+This script downloads surface (-2.35 m) Salinity (salt) from the GBR4 AIMS
+eReefs THREDDS data service. The data is cropped to the specified bounding
 box to reduce the total amount of data. This bounding box was chosen to 
 align with the G2G test data corresponding to the southern region of the 
 GBR.
@@ -19,22 +19,42 @@ import os
 import argparse
 
 # Create the argument parser
-parser = argparse.ArgumentParser(description="Download surface (-2.35 m) Salinity (salt) from the GBR1 AIMS eReefs "
+parser = argparse.ArgumentParser(description="Download surface (-2.35 m) Salinity (salt) from the GBR4 AIMS eReefs "
                                              "THREDDS data service.")
 
 # Define parameters (positional or optional)
 parser.add_argument("year", type=str, help="The year for which to download the files.")
+parser.add_argument(
+    "--start-date",
+    type=str,
+    default=None,
+    help="Optional start date in YYYY-MM-DD format. Defaults to <year>-01-01.",
+)
+parser.add_argument(
+    "--end-date",
+    type=str,
+    default=None,
+    help="Optional end date in YYYY-MM-DD format. Defaults to <year>-12-31.",
+)
 
 # Parse the arguments
 args = parser.parse_args()
-print(f"Downloading daily eReefs Hydro data for the year {args.year} ...")
 
 # specify the URL of the OpenDAP endpoint
-url = 'https://thredds.ereefs.aims.gov.au/thredds/dodsC/gbr1_2.0/daily.nc'
+url = 'https://thredds.ereefs.aims.gov.au/thredds/dodsC/gbr4_v4/daily.nc'
 
 # specify the start and end dates
-start_date = f"{args.year}-01-01"
-end_date = f"{args.year}-12-31"
+start_date = args.start_date or f"{args.year}-01-01"
+end_date = args.end_date or f"{args.year}-12-31"
+print(
+    f"Downloading daily eReefs Hydro data for {args.year} "
+    f"from {start_date} to {end_date} ..."
+)
+
+if start_date > end_date:
+    print("Start date must be less than or equal to end date.")
+    sys.exit(1)
+
 dates = pd.date_range(start=start_date, end=end_date, freq='D') + pd.Timedelta('14h')
 
 # specify the bounding box
@@ -49,8 +69,8 @@ destination_folder = os.path.join("src-data", "eReefs-hydro")
 # depth layer to download
 depth = -2.35
 
-# for reference (GBR1)
-gbr1_depth_to_k_table = {
+# for reference (GBR4)
+gbr4_depth_to_k_table = {
     -0.5: 15,
     -2.35: 14,
     -5.25: 13,
@@ -69,7 +89,7 @@ gbr1_depth_to_k_table = {
     -140.0: 0
 }
 
-k = gbr1_depth_to_k_table.get(depth, None)
+k = gbr4_depth_to_k_table.get(depth, None)
 if k is None:
     print(f"Depth {depth} not found in the lookup table.")
     sys.exit(1)
@@ -82,7 +102,7 @@ ds = xr.open_dataset(url)
 
 # download the data one day at a time, select the data within the bounding box, and save the result to a new NetCDF file
 for i, date in enumerate(dates):
-    filename = os.path.join(destination_folder, f'GBR1_H2p0_salt_crop_{date.strftime("%Y-%m-%d")}.nc')
+    filename = os.path.join(destination_folder, f'GBR4_H2p0_salt_crop_{date.strftime("%Y-%m-%d")}.nc')
     filename_tmp = f'{filename}.tmp'
     
     # Clean up any temp files left over from previous runs

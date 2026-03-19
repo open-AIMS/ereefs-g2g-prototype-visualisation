@@ -1,8 +1,8 @@
 """
 Eric Lawrey, Marc Hammerton - Australian Institute of Marine Science
 This script generates a video for each year showing both the G2G land run off
-data and the eReefs GBR1 Hydro salinity data. These videos are intended as a
-prototype of this visualisation. The GBR1 Hydro data needed for this visualisations
+data and the eReefs GBR4 Hydro salinity data. These videos are intended as a
+prototype of this visualisation. The GBR4 Hydro data needed for this visualisations
 can be obtained by running `02-get-daily-ereefs-hydro-data.py`. The basemap
 data get be obtained by running `01-download-base-map-data.py`. The G2G test
 data is not yet public. It was downloaded from the eReefs area on NCI.
@@ -27,7 +27,7 @@ from datetime import datetime
 
 # Create the argument parser
 parser = argparse.ArgumentParser(description="Generate a video for a selected year showing both the G2G land run off "
-                                             "data and the eReefs GBR1 Hydro salinity data.")
+                                             "data and the eReefs GBR4 Hydro salinity data.")
 
 # Define parameters (positional or optional)
 parser.add_argument("year", type=str, help="The year for which to generate the video.")
@@ -54,7 +54,7 @@ if not os.path.exists(export):
 print(f'Creating video for {year}')
 year_str = str(year)
 basemap_path = os.path.join('src-data','GBR_AIMS_eReefs-basemap')
-name = f"G2G-GBR1-Hydro-v2.0-Salt_{year_str}"
+name = f"G2G-GBR4-Hydro-v4-Salt_{year_str}"
 video_file = os.path.join(export, f"{name}.mp4")
 video_file_tmp = os.path.join(export, f"{name}.tmp.mp4")
 
@@ -89,19 +89,19 @@ lat_min, lat_max = g2g_data.lat.min().values, g2g_data.lat.max().values
 lon_min, lon_max = g2g_data.lon.min().values, g2g_data.lon.max().values
 
 # ============= Load Salinity ===============
-gbr1_salt_root = f'src-data/eReefs-hydro/GBR1_H2p0_salt_crop_{year_str}*.nc'
-gbr1_salt_ds = xr.open_mfdataset(gbr1_salt_root, combine='nested', concat_dim='time')
+gbr4_salt_root = f'src-data/eReefs-hydro/GBR4_H2p0_salt_crop_{year_str}*.nc'
+gbr4_salt_ds = xr.open_mfdataset(gbr4_salt_root, combine='nested', concat_dim='time')
 
-gbr1_salt = gbr1_salt_ds['salt']
+gbr4_salt = gbr4_salt_ds['salt']
 
-# Set the extent and limits for gbr1_salt visualisation scale
-lat_min_salt, lat_max_salt = gbr1_salt.latitude.min().values, gbr1_salt.latitude.max().values
-lon_min_salt, lon_max_salt = gbr1_salt.longitude.min().values, gbr1_salt.longitude.max().values
+# Set the extent and limits for gbr4_salt visualisation scale
+lat_min_salt, lat_max_salt = gbr4_salt.latitude.min().values, gbr4_salt.latitude.max().values
+lon_min_salt, lon_max_salt = gbr4_salt.longitude.min().values, gbr4_salt.longitude.max().values
 
 
 # ============= Plot setup =============
 fig, ax = plt.subplots(figsize=(12, 16.5), subplot_kw={'projection': ccrs.PlateCarree()})
-fig.subplots_adjust(left=0.05, right=0.95, bottom=0.08, top=0.94)
+fig.subplots_adjust(left=0.05, right=0.95, bottom=0.08, top=0.92)
 ax.set_aspect('equal')
 
 # ============= Set plot extents =========
@@ -173,8 +173,8 @@ im_river_flow = plt.imshow(g2g_d0, cmap=transparent_cmap, norm=norm, extent=exte
                            origin='lower')
 # ============== Plot Salinity ===============
 extent_salt = [lon_min_salt, lon_max_salt, lat_min_salt, lat_max_salt]
-vmin_salt = gbr1_salt.min().values
-vmax_salt = gbr1_salt.max().values
+vmin_salt = gbr4_salt.min().values
+vmax_salt = gbr4_salt.max().values
 
 # Based on https://github.com/eatlas/GBR_AIMS_eReefs-basemap/blob/main/colour-ramps/styles/RedBlueRainbowSalt_24-36-PSU.pal
 salt_color_ramp = [
@@ -192,24 +192,26 @@ salt_cmap = matplotlib.colors.LinearSegmentedColormap.from_list("", salt_color_r
 salt_norm = matplotlib.colors.Normalize(vmin=24, vmax=36)
 
 
-# Plot gbr1_salt data. Use origin='lower' to flip the y-direction
-im_salt = plt.imshow(gbr1_salt[0].values, cmap=salt_cmap, vmin=vmin_salt, vmax=vmax_salt, extent=extent_salt, zorder=2, transform=ccrs.PlateCarree(), origin='lower')
+# Plot gbr4_salt data. Use origin='lower' to flip the y-direction
+im_salt = plt.imshow(gbr4_salt[0].values, cmap=salt_cmap, vmin=vmin_salt, vmax=vmax_salt, extent=extent_salt, zorder=2, transform=ccrs.PlateCarree(), origin='lower')
 
 # ============== Legends ===============
 dates = g2g_data.time.values
 date_str = pd.to_datetime(str(dates[0])).strftime('%Y-%m-%d')
 
 ax_left = ax.get_position().x0
-fig.text(0.5, 0.985, "River flow and Salinity", ha="center", va="top", fontsize=24, fontweight="bold")
-fig.text(ax_left, 0.964, "Queensland", ha="left", va="top", fontsize=18)
+fig.text(0.5, 0.978, "River flow and Salinity (-2.35 m)", ha="center", va="top", fontsize=24, fontweight="bold")
+fig.text(ax_left, 0.944, "Queensland", ha="left", va="top", fontsize=20)
 date_text = ax.text(
     0.5,
-    0.99,
+    0.944,
     date_str,
-    transform=ax.transAxes,
+    transform=fig.transFigure,
     ha="center",
     va="top",
     fontsize=20,
+    fontweight="bold",
+    clip_on=False,
     path_effects=[pe.withStroke(linewidth=3, foreground="white")],
 )
 
@@ -220,7 +222,7 @@ fig.text(ax_right, 0.063, f"Variable IDs: {v}, salt", ha="right", va="bottom",
 # Metadata in bottom right corner
 today_str = datetime.now().strftime("%d-%b-%Y")
 metadata_text = (
-    f"Data: BOM G2G, eReefs CSIRO GBR1 Hydrodynamic Model v2.0\n"
+    f"Data: BOM G2G, eReefs CSIRO GBR4 Hydrodynamic Model v4\n"
     f"Map generation: AIMS {today_str}\n"
     f"Licensing: Creative Commons Attribution 4.0 International (https://creativecommons.org/licenses/by/4.0/)"
 )
@@ -251,7 +253,7 @@ cb1.ax.yaxis.tick_right()
 # ============== Animate the plots ==============
 if animate:
     fps = 8
-    N = min(len(g2g_data),len(gbr1_salt))
+    N = min(len(g2g_data),len(gbr4_salt))
 
     with open("test.log", "w", buffering=1) as f:
         def animate_func(i):
@@ -262,7 +264,7 @@ if animate:
             date_str_i = pd.to_datetime(str(dates[i])).strftime('%Y-%m-%d')
             date_text.set_text(date_str_i)
             im_river_flow.set_array(g2g_data[i].values)
-            im_salt.set_array(gbr1_salt[i].values)
+            im_salt.set_array(gbr4_salt[i].values)
             return [im_river_flow, im_salt, date_text]
         
         anim = animation.FuncAnimation(fig, animate_func, frames=N, interval=1000/fps, blit=True)
