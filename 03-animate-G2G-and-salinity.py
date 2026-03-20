@@ -8,8 +8,10 @@ import argparse
 import os
 import sys
 from datetime import datetime
+from typing import cast
 
 import cartopy.crs as ccrs
+from cartopy.mpl.geoaxes import GeoAxes
 import geopandas as gpd
 import matplotlib
 import matplotlib.animation as animation
@@ -82,9 +84,9 @@ def create_animation(
     land: gpd.GeoDataFrame,
     reefs: gpd.GeoDataFrame,
     cities_gdf: gpd.GeoDataFrame,
-    transparent_cmap: mpl.colors.Colormap,
-    salt_cmap: mpl.colors.Colormap,
-    norm: mpl.colors.BoundaryNorm,
+    transparent_cmap: colors.Colormap,
+    salt_cmap: colors.Colormap,
+    norm: colors.BoundaryNorm,
     ticks: list[float],
     export_dir: str,
     var_name: str,
@@ -122,6 +124,7 @@ def create_animation(
         os.remove(video_file_tmp)
 
     fig, ax = plt.subplots(figsize=(12, 16.5), subplot_kw={"projection": ccrs.PlateCarree()})
+    ax = cast(GeoAxes, ax)
     fig.subplots_adjust(left=0.05, right=0.95, bottom=0.08, top=0.92)
     ax.set_aspect("equal")
     ax.set_extent([map_west, map_east, map_south, map_north], crs=ccrs.PlateCarree())
@@ -137,7 +140,7 @@ def create_animation(
     rivers.plot(
         ax=ax,
         linewidth=0.5,
-        edgecolor="#9090d050",
+        edgecolor="#b4b4b450",
         facecolor="none",
         zorder=1,
         transform=ccrs.PlateCarree(),
@@ -180,18 +183,18 @@ def create_animation(
         plt.close(fig)
         return
 
-    extent_g2g = [
+    extent_g2g = (
         float(g2g_zoom.lon.min().values),
         float(g2g_zoom.lon.max().values),
         float(g2g_zoom.lat.min().values),
         float(g2g_zoom.lat.max().values),
-    ]
-    extent_salt = [
+    )
+    extent_salt = (
         float(gbr4_salt_zoom.longitude.min().values),
         float(gbr4_salt_zoom.longitude.max().values),
         float(gbr4_salt_zoom.latitude.min().values),
         float(gbr4_salt_zoom.latitude.max().values),
-    ]
+    )
 
     im_river_flow = plt.imshow(
         g2g_zoom[0].values,
@@ -203,15 +206,15 @@ def create_animation(
         origin="lower",
     )
 
-    vmin_salt = gbr4_salt_zoom.min().values
-    vmax_salt = gbr4_salt_zoom.max().values
+    vmin_salt = 24.0
+    vmax_salt = 37.0
     im_salt = plt.imshow(
         gbr4_salt_zoom[0].values,
         cmap=salt_cmap,
         vmin=vmin_salt,
         vmax=vmax_salt,
         extent=extent_salt,
-        zorder=2,
+        zorder=0,
         transform=ccrs.PlateCarree(),
         origin="lower",
     )
@@ -225,7 +228,7 @@ def create_animation(
     fig.text(
         0.5,
         0.978,
-        "Daily River Flow and Salinity (-2.35 m)",
+        "Daily River Flow and Salinity (-1.5 m)",
         ha="center",
         va="top",
         fontsize=24,
@@ -274,14 +277,25 @@ def create_animation(
         linespacing=1.5,
     )
 
-    cb_ax1 = ax.inset_axes((0.04, 0.02, 0.030, 0.28))
-    cb_ax2 = ax.inset_axes((0.18, 0.02, 0.030, 0.28))
+    cb_ax1 = ax.inset_axes((0.04, 0.03, 0.030, 0.28))
+    cb_ax2 = ax.inset_axes((0.18, 0.03, 0.030, 0.28))
     cb1 = fig.colorbar(im_river_flow, cax=cb_ax1, orientation="vertical", ticks=ticks)
-    cb2 = fig.colorbar(im_salt, cax=cb_ax2, orientation="vertical")
+    salt_ticks = list(range(24, 38, 2))
+    cb2 = fig.colorbar(im_salt, cax=cb_ax2, orientation="vertical", ticks=salt_ticks)
     cb_ax1.set_facecolor((1, 1, 1, 0.6))
     cb_ax2.set_facecolor((1, 1, 1, 0.6))
-    cb1.set_label("Daily Mean River Flow (m^3/s)", fontsize=12, fontweight="bold")
-    cb2.set_label("Average Salinity (PSU)", fontsize=12, fontweight="bold")
+    cb1.set_label(
+        "Daily Mean River Flow (m^3/s)",
+        fontsize=12,
+        fontweight="bold",
+        labelpad=2,
+    )
+    cb2.set_label(
+        "Average Salinity (PSU)",
+        fontsize=12,
+        fontweight="bold",
+        labelpad=8,
+    )
     cb1.ax.yaxis.set_tick_params(labelsize=10)
     cb2.ax.yaxis.set_tick_params(labelsize=10)
     cb1.ax.yaxis.set_label_position("right")
@@ -389,33 +403,33 @@ def main() -> None:
 
     g2g_data, gbr4_salt = normalize_coords(g2g_data, gbr4_salt)
 
-    color_ramp = np.array(["#f7fbff00", "#6baed6ff", "#08519cff", "#021e44ff"])
+    color_ramp = np.array(["#f7fbff00", "#4e95beff", "#03407eff", "#000000ff"])
     cmap = colors.LinearSegmentedColormap.from_list("", color_ramp)
     colors_ramp = cmap(np.arange(cmap.N))
     colors_ramp[: int(1e-1 * cmap.N), -1] = 0
-    transparent_cmap = mpl.colors.ListedColormap(colors_ramp)
+    transparent_cmap = colors.ListedColormap(colors_ramp)
 
     salt_color_ramp = [
-        "#5c0035", "#6b0032", "#7a002f", "#89002d", "#98002a", "#a60027", "#b30224",
-        "#ba0821", "#c10e1e", "#c8141a", "#cf1a17", "#d62014", "#dd2610", "#e42c0d",
-        "#eb3209", "#f23806", "#f93e03", "#ff4500", "#ff4e00", "#ff5700", "#ff6000",
-        "#ff6a00", "#ff7300", "#ff7c00", "#ff8500", "#ff9009", "#ff9b14", "#ffa620",
-        "#ffb12b", "#ffbd37", "#ffc540", "#ffcb47", "#ffd14d", "#ffd754", "#ffdc5b",
-        "#ffe262", "#ffe868", "#ffee6f", "#fff372", "#fff873", "#fffd74", "#f1ffa0",
-        "#d4ffdb", "#9cf9dc", "#62e6da", "#39cae2", "#358cf6", "#3146f0", "#3a0db2",
-        "#380060",
+        "#5c0035", "#7a002f", "#89002d", "#98002a", "#a60027", "#b30224", 
+        "#ba0821", "#c8141a", "#cf1a17", "#d62014", "#dd2610", "#eb3209", 
+        "#f93e03", "#ff4500", "#ff4e00", "#ff5700", "#ff6000", "#ff7c00", 
+        "#ff8500", "#ff9009", "#ffa620", "#ffb12b", "#ffc540", "#ffcb47", 
+        "#ffd14d", "#ffd754", "#ffdc5b", "#ffe262", "#ffee6f", "#fff372", 
+        "#fff873", "#fffd74", "#f1ffa0", "#d4ffdb", "#9cf9dc", "#62e6da", 
+        "#39cae2", "#358cf6", "#3146f0", "#3a0db2", "#3a128e", "#380060",
     ]
-    salt_cmap = matplotlib.colors.LinearSegmentedColormap.from_list("", salt_color_ramp)
+
+    salt_cmap = colors.LinearSegmentedColormap.from_list("", salt_color_ramp)
 
     vmin = 1.0
-    vmax = 5000.0
+    vmax = 3000.0
     bounds = np.logspace(np.log10(vmin), np.log10(vmax), cmap.N)
-    norm = mpl.colors.BoundaryNorm(bounds, transparent_cmap.N)
+    norm = colors.BoundaryNorm(bounds, transparent_cmap.N)
 
     ticks = []
     for decade in np.arange(np.floor(np.log10(vmin)), np.ceil(np.log10(vmax)) + 1):
         scale = 10 ** decade
-        tick_value = 5 * scale
+        tick_value = 3 * scale
         if vmin <= tick_value <= vmax:
             ticks.append(tick_value)
 
