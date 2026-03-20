@@ -1,286 +1,464 @@
 """
 Eric Lawrey, Marc Hammerton - Australian Institute of Marine Science
-This script generates a video for each year showing both the G2G land run off
-data and the eReefs GBR4 Hydro salinity data. These videos are intended as a
-prototype of this visualisation. The GBR4 Hydro data needed for this visualisations
-can be obtained by running `02-get-daily-ereefs-hydro-data.py`. The basemap
-data get be obtained by running `01-download-base-map-data.py`. The G2G test
-data is not yet public. It was downloaded from the eReefs area on NCI.
+This script generates full-region and zoomed videos showing both G2G land runoff
+and eReefs GBR4 Hydro salinity data. It combines the previous separate full and
+zoom scripts into one entry point.
 """
+import argparse
+import os
 import sys
+from datetime import datetime
+
+import cartopy.crs as ccrs
+import geopandas as gpd
+import matplotlib
+import matplotlib.animation as animation
+import matplotlib.colors as colors
+import matplotlib.patheffects as pe
+import matplotlib.pyplot as plt
+import matplotlib as mpl
 import numpy as np
 import pandas as pd
 import xarray as xr
-import matplotlib as mpl
-mpl.use("agg")
-import matplotlib.pyplot as plt
-import matplotlib.patheffects as pe
-import matplotlib.animation as animation
-import geopandas as gpd
-import cartopy.crs as ccrs
-import matplotlib.colors as colors
-import matplotlib
-import os
 from shapely.geometry import Point
-import argparse
-from datetime import datetime
 
-# Create the argument parser
-parser = argparse.ArgumentParser(description="Generate a video for a selected year showing both the G2G land run off "
-                                             "data and the eReefs GBR4 Hydro salinity data.")
+mpl.use("agg")
 
-# Define parameters (positional or optional)
-parser.add_argument("year", type=str, help="The year for which to generate the video.")
+DATA_BOUNDS = {
+    "north": -10.65,
+    "south": -29.30,
+    "west": 141.8,
+    "east": 155.8,
+}
 
-# Parse the arguments
-args = parser.parse_args()
-year = args.year
-print(f"Generating video for the year {year} ...")
-
-# Variable to plot from G2G model
-v='g2gflow'
-
-# Folder containing the g2g data
-g2g_root = f"./src-data/g2g-data/extracted_files"
-
-export = 'export'
-
-animate = True  # Don't animate when we are prototyping new changes to the plots
-
-if not os.path.exists(export):
-    os.makedirs(export)
-        
-
-print(f'Creating video for {year}')
-year_str = str(year)
-basemap_path = os.path.join('src-data','GBR_AIMS_eReefs-basemap')
-name = f"G2G-GBR4-Hydro-v4-Salt_{year_str}"
-video_file = os.path.join(export, f"{name}.mp4")
-video_file_tmp = os.path.join(export, f"{name}.tmp.mp4")
-
-# Clean up any temp files left over from previous runs
-if os.path.exists(video_file_tmp):
-    print('Removing temporary file')
-    os.remove(video_file_tmp)
+ZOOM_REGIONS = {
+    "queensland": {
+        "north": -10.65,
+        "south": -29.30,
+        "west": 141.8,
+        "east": 155.8,
+    },
+    "north": {
+        "north": -10.65,
+        "south": -21.5,
+        "west": 141.8,
+        "east": 149.9,
+    },
+    "central": {
+        "north": -15.1,
+        "south": -25.03,
+        "west": 145.15,
+        "east": 152.57,
+    },
+    "south": {
+        "north": -18.95,
+        "south": -28.702,
+        "west": 148.45,
+        "east": 155.8,
+    },
+}
 
 
-# Read the shapefile with geopandas
-rivers = gpd.read_file(os.path.join(basemap_path,'GBR_AIMS_eReefs-basemap_GA-topo5m-drainage.shp'))
-land = gpd.read_file(os.path.join(basemap_path,'GBR_AIMS_eReefs-basemap_Land-and-Basins.shp'))
-reefs = gpd.read_file(os.path.join(basemap_path,'GBR_AIMS_eReefs-basemap_Reefs.shp'))
-
-# =============== Load G2G data ===============
-# Load G2G data
-g2g_nc_path = f"{g2g_root}/{year_str}/sidb2netcdf_{v}_20*.nc"
-print(g2g_nc_path)
-
-g2g_ds = xr.open_mfdataset(g2g_nc_path)
-
-# Dig out var we want
-g2g_data_raw = g2g_ds["{}".format(v)]
-
-# Replace -999 vals with nan (I thought we already got rid of those?)
-g2g_data_nans = g2g_data_raw.where(g2g_data_raw!=-999.)
-
-# Aggregate to daily mean flow (cumecs, m^3/s)
-g2g_data = g2g_data_nans.resample(time='1D', skipna=True).mean(skipna=True)
- 
-# Set the extent of the G2G to the extent of the raster data
-lat_min, lat_max = g2g_data.lat.min().values, g2g_data.lat.max().values
-lon_min, lon_max = g2g_data.lon.min().values, g2g_data.lon.max().values
-
-# ============= Load Salinity ===============
-gbr4_salt_root = f'src-data/eReefs-hydro/GBR4_H2p0_salt_crop_{year_str}*.nc'
-gbr4_salt_ds = xr.open_mfdataset(gbr4_salt_root, combine='nested', concat_dim='time')
-
-gbr4_salt = gbr4_salt_ds['salt']
-
-# Set the extent and limits for gbr4_salt visualisation scale
-lat_min_salt, lat_max_salt = gbr4_salt.latitude.min().values, gbr4_salt.latitude.max().values
-lon_min_salt, lon_max_salt = gbr4_salt.longitude.min().values, gbr4_salt.longitude.max().values
+def normalize_coords(g2g: xr.DataArray, salt: xr.DataArray) -> tuple[xr.DataArray, xr.DataArray]:
+    """Ensure coordinate axes are ascending for consistent geospatial plotting."""
+    if g2g.lat.values[0] > g2g.lat.values[-1]:
+        g2g = g2g.sortby("lat")
+    if g2g.lon.values[0] > g2g.lon.values[-1]:
+        g2g = g2g.sortby("lon")
+    if salt.latitude.values[0] > salt.latitude.values[-1]:
+        salt = salt.sortby("latitude")
+    if salt.longitude.values[0] > salt.longitude.values[-1]:
+        salt = salt.sortby("longitude")
+    return g2g, salt
 
 
-# ============= Plot setup =============
-fig, ax = plt.subplots(figsize=(12, 16.5), subplot_kw={'projection': ccrs.PlateCarree()})
-fig.subplots_adjust(left=0.05, right=0.95, bottom=0.08, top=0.92)
-ax.set_aspect('equal')
+def create_animation(
+    region_name: str,
+    year: str,
+    map_bounds: dict,
+    g2g_data: xr.DataArray,
+    gbr4_salt: xr.DataArray,
+    rivers: gpd.GeoDataFrame,
+    land: gpd.GeoDataFrame,
+    reefs: gpd.GeoDataFrame,
+    cities_gdf: gpd.GeoDataFrame,
+    transparent_cmap: mpl.colors.Colormap,
+    salt_cmap: mpl.colors.Colormap,
+    norm: mpl.colors.BoundaryNorm,
+    ticks: list[float],
+    export_dir: str,
+    var_name: str,
+    animate: bool,
+) -> None:
+    """Render an animation or preview image for one region."""
+    print(f"\n{'=' * 60}")
+    print(f"Generating {region_name} animation...")
+    print(f"{'=' * 60}")
 
-# ============= Set plot extents =========
-ax.set_extent([max(lon_min,lon_min_salt), max(lon_max,lon_max_salt), 
-    max(lat_min,lat_min_salt), max(lat_max, lat_max_salt)], crs=ccrs.PlateCarree())
-# ax.set_extent([141.8, 155.8, -10.65, -29.30], crs=ccrs.PlateCarree())
+    north = map_bounds["north"]
+    south = map_bounds["south"]
+    west = map_bounds["west"]
+    east = map_bounds["east"]
+    print(f"Bounds: lat [{south}, {north}], lon [{west}, {east}]")
 
-extent = [lon_min, lon_max, lat_min, lat_max]
+    # Map can extend beyond data bounds.
+    map_north, map_south = north, south
+    map_west, map_east = west, east
 
-# ============= Add Land, Rivers and Reefs ===========
-# Plot the rivers as a base map
-land.plot(ax=ax, linewidth=0.5, edgecolor='#898989', facecolor='#F7F7EB', zorder=1, transform=ccrs.PlateCarree())
-rivers.plot(ax=ax, linewidth=0.5, edgecolor='#9090d050', facecolor='none', zorder=1, transform=ccrs.PlateCarree())
+    # Data must remain within downloaded data bounds.
+    data_north = min(north, DATA_BOUNDS["north"])
+    data_south = max(south, DATA_BOUNDS["south"])
+    data_west = max(west, DATA_BOUNDS["west"])
+    data_east = min(east, DATA_BOUNDS["east"])
 
-# Place the reefs on top (zorder=3)
-reefs.plot(ax=ax, color='black', zorder=3, alpha=0.4)
-# =========== Add cities ============
-cities = gpd.read_file(os.path.join(basemap_path,'GBR_AIMS_eReefs-basemap_Cities_2023.csv'))
-cities['latitude'] = cities['latitude'].astype(float)
-cities['longitude'] = cities['longitude'].astype(float)
+    year_str = str(year)
+    name = f"G2G-GBR4-Hydro-v4-Salt_{year_str}-{region_name}"
+
+    video_file = os.path.join(export_dir, f"{name}.mp4")
+    video_file_tmp = os.path.join(export_dir, f"{name}.tmp.mp4")
+    preview_file = os.path.join(export_dir, f"{name}-preview.png")
+
+    if os.path.exists(video_file_tmp):
+        os.remove(video_file_tmp)
+
+    fig, ax = plt.subplots(figsize=(12, 16.5), subplot_kw={"projection": ccrs.PlateCarree()})
+    fig.subplots_adjust(left=0.05, right=0.95, bottom=0.08, top=0.92)
+    ax.set_aspect("equal")
+    ax.set_extent([map_west, map_east, map_south, map_north], crs=ccrs.PlateCarree())
+
+    land.plot(
+        ax=ax,
+        linewidth=0.5,
+        edgecolor="#898989",
+        facecolor="#F7F7EB",
+        zorder=1,
+        transform=ccrs.PlateCarree(),
+    )
+    rivers.plot(
+        ax=ax,
+        linewidth=0.5,
+        edgecolor="#9090d050",
+        facecolor="none",
+        zorder=1,
+        transform=ccrs.PlateCarree(),
+    )
+    reefs.plot(ax=ax, color="black", zorder=3, alpha=0.4)
+
+    cities_gdf_filtered = cities_gdf[cities_gdf["ereefs_scale"] <= 1]
+    minx, maxx, miny, maxy = ax.get_extent()
+    cities_gdf_filtered = cities_gdf_filtered.cx[minx:maxx, miny:maxy]
+    cities_gdf_filtered.plot(ax=ax, color="black", zorder=3, markersize=10)
+    for x, y, label in zip(
+        cities_gdf_filtered.geometry.x,
+        cities_gdf_filtered.geometry.y,
+        cities_gdf_filtered["name"],
+    ):
+        ax.text(
+            x,
+            y,
+            label + " ",
+            verticalalignment="center",
+            horizontalalignment="right",
+            fontsize=14,
+            path_effects=[pe.withStroke(linewidth=3, foreground="white")],
+        )
+
+    g2g_zoom = g2g_data.sel(lat=slice(data_south, data_north), lon=slice(data_west, data_east))
+    gbr4_salt_zoom = gbr4_salt.sel(
+        latitude=slice(data_south, data_north),
+        longitude=slice(data_west, data_east),
+    )
+    g2g_zoom, gbr4_salt_zoom = normalize_coords(g2g_zoom, gbr4_salt_zoom)
+
+    if (
+        g2g_zoom.sizes.get("lat", 0) == 0
+        or g2g_zoom.sizes.get("lon", 0) == 0
+        or gbr4_salt_zoom.sizes.get("latitude", 0) == 0
+        or gbr4_salt_zoom.sizes.get("longitude", 0) == 0
+    ):
+        print(f"Skipping {region_name}: empty data slice for selected bounds")
+        plt.close(fig)
+        return
+
+    extent_g2g = [
+        float(g2g_zoom.lon.min().values),
+        float(g2g_zoom.lon.max().values),
+        float(g2g_zoom.lat.min().values),
+        float(g2g_zoom.lat.max().values),
+    ]
+    extent_salt = [
+        float(gbr4_salt_zoom.longitude.min().values),
+        float(gbr4_salt_zoom.longitude.max().values),
+        float(gbr4_salt_zoom.latitude.min().values),
+        float(gbr4_salt_zoom.latitude.max().values),
+    ]
+
+    im_river_flow = plt.imshow(
+        g2g_zoom[0].values,
+        cmap=transparent_cmap,
+        norm=norm,
+        extent=extent_g2g,
+        zorder=2,
+        transform=ccrs.PlateCarree(),
+        origin="lower",
+    )
+
+    vmin_salt = gbr4_salt_zoom.min().values
+    vmax_salt = gbr4_salt_zoom.max().values
+    im_salt = plt.imshow(
+        gbr4_salt_zoom[0].values,
+        cmap=salt_cmap,
+        vmin=vmin_salt,
+        vmax=vmax_salt,
+        extent=extent_salt,
+        zorder=2,
+        transform=ccrs.PlateCarree(),
+        origin="lower",
+    )
+
+    dates = g2g_zoom.time.values
+    date_str = pd.to_datetime(str(dates[0])).strftime("%Y-%m-%d")
+    ax_left = ax.get_position().x0
+    ax_right = ax.get_position().x1
+    region_label = region_name.capitalize()
+
+    fig.text(
+        0.5,
+        0.978,
+        "Daily River Flow and Salinity (-2.35 m)",
+        ha="center",
+        va="top",
+        fontsize=24,
+        fontweight="bold",
+    )
+    fig.text(ax_left, 0.944, region_label, ha="left", va="top", fontsize=20)
+    date_text = ax.text(
+        0.5,
+        0.944,
+        date_str,
+        transform=fig.transFigure,
+        ha="center",
+        va="top",
+        fontsize=20,
+        fontweight="bold",
+        clip_on=False,
+        path_effects=[pe.withStroke(linewidth=3, foreground="white")],
+    )
+
+    fig.text(
+        ax_right,
+        0.063,
+        f"Variable IDs: {var_name}, salt",
+        ha="right",
+        va="bottom",
+        fontsize=11,
+        color="gray",
+    )
+
+    today_str = datetime.now().strftime("%d-%b-%Y")
+    metadata_text = (
+        f"Map generation: AIMS {today_str}\n"
+        f"Data: BOM G2G (DOI: <insert DOI here>), eReefs CSIRO GBR4 Hydrodynamic Model v4 "
+        f"(AIMS daily aggregate product, DOI: 10.26274/Y74K-T032)\n"
+        f"Licensing: Creative Commons Attribution 4.0 International "
+        f"(https://creativecommons.org/licenses/by/4.0/)"
+    )
+    fig.text(
+        ax_left,
+        0.020,
+        metadata_text,
+        ha="left",
+        va="bottom",
+        fontsize=9,
+        color="black",
+        linespacing=1.5,
+    )
+
+    cb_ax1 = ax.inset_axes((0.04, 0.02, 0.030, 0.28))
+    cb_ax2 = ax.inset_axes((0.18, 0.02, 0.030, 0.28))
+    cb1 = fig.colorbar(im_river_flow, cax=cb_ax1, orientation="vertical", ticks=ticks)
+    cb2 = fig.colorbar(im_salt, cax=cb_ax2, orientation="vertical")
+    cb_ax1.set_facecolor((1, 1, 1, 0.6))
+    cb_ax2.set_facecolor((1, 1, 1, 0.6))
+    cb1.set_label("Daily Mean River Flow (m^3/s)", fontsize=12, fontweight="bold")
+    cb2.set_label("Average Salinity (PSU)", fontsize=12, fontweight="bold")
+    cb1.ax.yaxis.set_tick_params(labelsize=10)
+    cb2.ax.yaxis.set_tick_params(labelsize=10)
+    cb1.ax.yaxis.set_label_position("right")
+    cb1.ax.yaxis.tick_right()
+    cb1.minorticks_off()
+    cb1.ax.set_yticklabels([f"{tick:,.0f}" for tick in ticks])
+
+    if animate:
+        fps = 8
+        N = min(len(g2g_zoom), len(gbr4_salt_zoom))
+        with open("test.log", "a", buffering=1) as file_obj:
+            file_obj.write(f"\n{'=' * 60}\n{region_name.upper()}\n{'=' * 60}\n")
+
+            def animate_func(i: int):
+                if i % fps == 0:
+                    message = f"Writing frame {i}/{N} for {region_name} ({year})\n"
+                    file_obj.write(message)
+                    sys.stdout.write(message)
+                date_str_i = pd.to_datetime(str(dates[i])).strftime("%Y-%m-%d")
+                date_text.set_text(date_str_i)
+                im_river_flow.set_array(g2g_zoom[i].values)
+                im_salt.set_array(gbr4_salt_zoom[i].values)
+                return [im_river_flow, im_salt, date_text]
+
+            anim = animation.FuncAnimation(
+                fig,
+                animate_func,
+                frames=N,
+                interval=1000 / fps,
+                blit=True,
+            )
+            anim.save(video_file_tmp, writer=animation.FFMpegWriter(bitrate=5000))
+            os.rename(video_file_tmp, video_file)
+            print(f"✓ Saved {video_file}")
+    else:
+        fig.savefig(preview_file, dpi=100, bbox_inches="tight")
+        print(f"✓ Saved {preview_file}")
+
+    plt.close(fig)
 
 
-cities['geometry'] = cities.apply(lambda row: Point(row['longitude'], row['latitude']), axis=1)
-cities_gdf = gpd.GeoDataFrame(cities)
-# Convert ereefs_scale to numeric, replacing errors with np.nan
-cities_gdf['ereefs_scale'] = pd.to_numeric(cities_gdf['ereefs_scale'], errors='coerce')
-cities_gdf_filtered = cities_gdf[cities_gdf['ereefs_scale'] <= 1]
-# Limit the cities to those that are on the plot (otherwise it draws cities
-# outside the plot)
-minx, maxx, miny, maxy = ax.get_extent()
-cities_gdf_filtered = cities_gdf_filtered.cx[minx:maxx, miny:maxy]
+def main() -> None:
+    """Entrypoint for generating full and/or zoomed animations."""
+    parser = argparse.ArgumentParser(
+        description=(
+            "Generate full and zoomed videos showing G2G land runoff and "
+            "eReefs GBR4 Hydro salinity data."
+        )
+    )
+    parser.add_argument("year", type=str, help="The year for which to generate videos.")
+    parser.add_argument(
+        "--regions",
+        type=str,
+        default="queensland,north,central,south",
+        help=(
+            "Comma-separated regions to generate. Supported: "
+            "queensland,north,central,south"
+        ),
+    )
+    parser.add_argument(
+        "--preview-image",
+        action="store_true",
+        help="Save one preview PNG per region instead of MP4 animations.",
+    )
+    args = parser.parse_args()
 
-cities_gdf_filtered.plot(ax=ax, color='black', zorder=3, markersize=10)
-for x, y, label in zip(cities_gdf_filtered.geometry.x, cities_gdf_filtered.geometry.y, cities_gdf_filtered['name']):
-    ax.text(x, y, label + ' ', verticalalignment='center', horizontalalignment='right', fontsize=14, 
-            path_effects=[pe.withStroke(linewidth=3, foreground='white')])
-            
+    year = args.year
+    animate = not args.preview_image
+    regions_to_process = [region.strip() for region in args.regions.split(",") if region.strip()]
+
+    print(f"Generating outputs for year {year}...")
+    print(f"Regions: {', '.join(regions_to_process)}")
+
+    var_name = "g2gflow"
+    g2g_root = "./src-data/g2g-data/extracted_files"
+    export_dir = "export"
+    if not os.path.exists(export_dir):
+        os.makedirs(export_dir)
+
+    year_str = str(year)
+    basemap_path = os.path.join("src-data", "GBR_AIMS_eReefs-basemap")
+
+    print("Loading basemap data...")
+    rivers = gpd.read_file(
+        os.path.join(basemap_path, "GBR_AIMS_eReefs-basemap_GA-topo5m-drainage.shp")
+    )
+    land = gpd.read_file(
+        os.path.join(basemap_path, "GBR_AIMS_eReefs-basemap_Land-and-Basins.shp")
+    )
+    reefs = gpd.read_file(
+        os.path.join(basemap_path, "GBR_AIMS_eReefs-basemap_Reefs.shp")
+    )
+
+    print("Loading G2G data...")
+    g2g_nc_path = f"{g2g_root}/{year_str}/sidb2netcdf_{var_name}_20*.nc"
+    g2g_ds = xr.open_mfdataset(g2g_nc_path)
+    g2g_data_raw = g2g_ds[var_name]
+    g2g_data_nans = g2g_data_raw.where(g2g_data_raw != -999.0)
+    g2g_data = g2g_data_nans.resample(time="1D", skipna=True).mean(skipna=True)
+
+    print("Loading salinity data...")
+    gbr4_salt_root = f"src-data/eReefs-hydro/GBR4_H2p0_salt_crop_{year_str}*.nc"
+    gbr4_salt_ds = xr.open_mfdataset(gbr4_salt_root, combine="nested", concat_dim="time")
+    gbr4_salt = gbr4_salt_ds["salt"]
+
+    g2g_data, gbr4_salt = normalize_coords(g2g_data, gbr4_salt)
+
+    color_ramp = np.array(["#f7fbff00", "#6baed6ff", "#08519cff", "#021e44ff"])
+    cmap = colors.LinearSegmentedColormap.from_list("", color_ramp)
+    colors_ramp = cmap(np.arange(cmap.N))
+    colors_ramp[: int(1e-1 * cmap.N), -1] = 0
+    transparent_cmap = mpl.colors.ListedColormap(colors_ramp)
+
+    salt_color_ramp = [
+        "#5c0035", "#6b0032", "#7a002f", "#89002d", "#98002a", "#a60027", "#b30224",
+        "#ba0821", "#c10e1e", "#c8141a", "#cf1a17", "#d62014", "#dd2610", "#e42c0d",
+        "#eb3209", "#f23806", "#f93e03", "#ff4500", "#ff4e00", "#ff5700", "#ff6000",
+        "#ff6a00", "#ff7300", "#ff7c00", "#ff8500", "#ff9009", "#ff9b14", "#ffa620",
+        "#ffb12b", "#ffbd37", "#ffc540", "#ffcb47", "#ffd14d", "#ffd754", "#ffdc5b",
+        "#ffe262", "#ffe868", "#ffee6f", "#fff372", "#fff873", "#fffd74", "#f1ffa0",
+        "#d4ffdb", "#9cf9dc", "#62e6da", "#39cae2", "#358cf6", "#3146f0", "#3a0db2",
+        "#380060",
+    ]
+    salt_cmap = matplotlib.colors.LinearSegmentedColormap.from_list("", salt_color_ramp)
+
+    vmin = 1.0
+    vmax = 5000.0
+    bounds = np.logspace(np.log10(vmin), np.log10(vmax), cmap.N)
+    norm = mpl.colors.BoundaryNorm(bounds, transparent_cmap.N)
+
+    ticks = []
+    for decade in np.arange(np.floor(np.log10(vmin)), np.ceil(np.log10(vmax)) + 1):
+        scale = 10 ** decade
+        tick_value = 5 * scale
+        if vmin <= tick_value <= vmax:
+            ticks.append(tick_value)
+
+    cities = gpd.read_file(os.path.join(basemap_path, "GBR_AIMS_eReefs-basemap_Cities_2023.csv"))
+    cities["latitude"] = cities["latitude"].astype(float)
+    cities["longitude"] = cities["longitude"].astype(float)
+    cities["geometry"] = cities.apply(
+        lambda row: Point(row["longitude"], row["latitude"]),
+        axis=1,
+    )
+    cities_gdf = gpd.GeoDataFrame(cities)
+    cities_gdf["ereefs_scale"] = pd.to_numeric(cities_gdf["ereefs_scale"], errors="coerce")
+
+    for region_name in regions_to_process:
+        if region_name in ZOOM_REGIONS:
+            bounds_to_use = ZOOM_REGIONS[region_name]
+        else:
+            print(f"Warning: Unknown region '{region_name}'. Skipping.")
+            continue
+
+        create_animation(
+            region_name=region_name,
+            year=year,
+            map_bounds=bounds_to_use,
+            g2g_data=g2g_data,
+            gbr4_salt=gbr4_salt,
+            rivers=rivers,
+            land=land,
+            reefs=reefs,
+            cities_gdf=cities_gdf,
+            transparent_cmap=transparent_cmap,
+            salt_cmap=salt_cmap,
+            norm=norm,
+            ticks=ticks,
+            export_dir=export_dir,
+            var_name=var_name,
+            animate=animate,
+        )
+
+    print(f"\n{'=' * 60}")
+    print("All requested outputs complete!")
+    print(f"{'=' * 60}")
 
 
-# ========== G2G plot ==============
-g2g_d0 = g2g_data[0].values
-
-# Set the limits on the visualisation scale (cumecs, m^3/s)
-vmin = 1.0
-vmax = 5000.0
-
-# Define the custom color ramp
-color_ramp = np.array([
-    '#f7fbff00',
-    '#6baed6ff',
-    '#08519cff',
-    '#021e44ff'
-])
-
-# Create a ListedColormap object using the color ramp
-#custom_cmap = ListedColormap(color_ramp)
-cmap = colors.LinearSegmentedColormap.from_list("", color_ramp)
-
-# Set transparent color for low values
-low_value_threshold = 1e-1
-colors_ramp = cmap(np.arange(cmap.N))
-colors_ramp[:int(low_value_threshold * cmap.N), -1] = 0
-transparent_cmap = mpl.colors.ListedColormap(colors_ramp)
-
-# Set the boundary for the colormap and create a BoundaryNorm object
-bounds = np.logspace(np.log10(vmin), np.log10(vmax), cmap.N)
-norm = mpl.colors.BoundaryNorm(bounds, transparent_cmap.N)
-
-# Build colorbar ticks as 5-only sequence across decades for readability
-ticks = []
-for decade in np.arange(np.floor(np.log10(vmin)), np.ceil(np.log10(vmax)) + 1):
-    scale = 10 ** decade
-    tick_value = 5 * scale
-    if vmin <= tick_value <= vmax:
-        ticks.append(tick_value)
-
-im_river_flow = plt.imshow(g2g_d0, cmap=transparent_cmap, norm=norm, extent=extent, zorder=2, transform=ccrs.PlateCarree(),
-                           origin='lower')
-# ============== Plot Salinity ===============
-extent_salt = [lon_min_salt, lon_max_salt, lat_min_salt, lat_max_salt]
-vmin_salt = gbr4_salt.min().values
-vmax_salt = gbr4_salt.max().values
-
-# Based on https://github.com/eatlas/GBR_AIMS_eReefs-basemap/blob/main/colour-ramps/styles/RedBlueRainbowSalt_24-36-PSU.pal
-salt_color_ramp = [
-    '#5c0035', '#6b0032', '#7a002f', '#89002d', '#98002a', '#a60027', '#b30224',
-    '#ba0821', '#c10e1e', '#c8141a', '#cf1a17', '#d62014', '#dd2610', '#e42c0d',
-    '#eb3209', '#f23806', '#f93e03', '#ff4500', '#ff4e00', '#ff5700', '#ff6000',
-    '#ff6a00', '#ff7300', '#ff7c00', '#ff8500', '#ff9009', '#ff9b14', '#ffa620',
-    '#ffb12b', '#ffbd37', '#ffc540', '#ffcb47', '#ffd14d', '#ffd754', '#ffdc5b',
-    '#ffe262', '#ffe868', '#ffee6f', '#fff372', '#fff873', '#fffd74', '#f1ffa0',
-    '#d4ffdb', '#9cf9dc', '#62e6da', '#39cae2', '#358cf6', '#3146f0', '#3a0db2',
-    '#380060'
-]
-
-salt_cmap = matplotlib.colors.LinearSegmentedColormap.from_list("", salt_color_ramp)
-salt_norm = matplotlib.colors.Normalize(vmin=24, vmax=36)
-
-
-# Plot gbr4_salt data. Use origin='lower' to flip the y-direction
-im_salt = plt.imshow(gbr4_salt[0].values, cmap=salt_cmap, vmin=vmin_salt, vmax=vmax_salt, extent=extent_salt, zorder=2, transform=ccrs.PlateCarree(), origin='lower')
-
-# ============== Legends ===============
-dates = g2g_data.time.values
-date_str = pd.to_datetime(str(dates[0])).strftime('%Y-%m-%d')
-
-ax_left = ax.get_position().x0
-fig.text(0.5, 0.978, "Daily River Flow and Salinity (-2.35 m)", ha="center", va="top", fontsize=24, fontweight="bold")
-fig.text(ax_left, 0.944, "Queensland", ha="left", va="top", fontsize=20)
-date_text = ax.text(
-    0.5,
-    0.944,
-    date_str,
-    transform=fig.transFigure,
-    ha="center",
-    va="top",
-    fontsize=20,
-    fontweight="bold",
-    clip_on=False,
-    path_effects=[pe.withStroke(linewidth=3, foreground="white")],
-)
-
-ax_right = ax.get_position().x1
-fig.text(ax_right, 0.063, f"Variable IDs: {v}, salt", ha="right", va="bottom",
-         fontsize=11, color="gray")
-
-# Metadata in bottom right corner
-today_str = datetime.now().strftime("%d-%b-%Y")
-metadata_text = (
-    f"Map generation: AIMS {today_str}\n"
-    f"Data: BOM G2G (DOI: <insert DOI here>), eReefs CSIRO GBR4 Hydrodynamic Model v4 (AIMS daily aggregate product, DOI: 10.26274/Y74K-T032)\n"
-    f"Licensing: Creative Commons Attribution 4.0 International (https://creativecommons.org/licenses/by/4.0/)"
-)
-fig.text(ax_left, 0.020, metadata_text, ha="left", va="bottom",
-         fontsize=9, color="black", linespacing=1.5)
-
-# Create colorbar axes inside the map (axes coordinates: left, bottom, width, height).
-cb_ax1 = ax.inset_axes((0.04, 0.02, 0.030, 0.28))
-cb_ax2 = ax.inset_axes((0.18, 0.02, 0.030, 0.28))
-
-# 🔹 Add vertical colorbars
-cb1 = fig.colorbar(im_river_flow, cax=cb_ax1, orientation="vertical", ticks=ticks)
-cb2 = fig.colorbar(im_salt, cax=cb_ax2, orientation="vertical")
-
-# 🔹 Set background color with transparency
-cb_ax1.set_facecolor((1, 1, 1, 0.6))  # Light gray with transparency
-cb_ax2.set_facecolor((1, 1, 1, 0.6))  # Lighter gray with transparency
-
-# 🔹 Customize colorbar labels and ticks
-cb1.set_label("Daily Mean River Flow (m^3/s)", fontsize=12, fontweight="bold")
-cb2.set_label("Average Salinity (PSU)", fontsize=12, fontweight="bold")
-
-cb1.ax.yaxis.set_tick_params(labelsize=10)
-cb2.ax.yaxis.set_tick_params(labelsize=10)
-cb1.ax.yaxis.set_label_position("right")
-cb1.ax.yaxis.tick_right()
-cb1.minorticks_off()
-cb1.ax.set_yticklabels([f"{tick:,.0f}" for tick in ticks])
-
-# ============== Animate the plots ==============
-if animate:
-    fps = 8
-    N = min(len(g2g_data),len(gbr4_salt))
-
-    with open("test.log", "w", buffering=1) as f:
-        def animate_func(i):
-            if i % fps ==0: 
-                message = f'Writing frame {i}/{N} for year {year}\n'
-                f.write(message)
-                sys.stdout.write(message)
-            date_str_i = pd.to_datetime(str(dates[i])).strftime('%Y-%m-%d')
-            date_text.set_text(date_str_i)
-            im_river_flow.set_array(g2g_data[i].values)
-            im_salt.set_array(gbr4_salt[i].values)
-            return [im_river_flow, im_salt, date_text]
-        
-        anim = animation.FuncAnimation(fig, animate_func, frames=N, interval=1000/fps, blit=True)
-        anim.save(video_file_tmp, writer=animation.FFMpegWriter(bitrate=5000))
-        os.rename(video_file_tmp, video_file)
-
-print("Done!")
+if __name__ == "__main__":
+    main()
