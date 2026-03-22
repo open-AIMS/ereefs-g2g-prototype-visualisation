@@ -74,6 +74,45 @@ def normalize_coords(g2g: xr.DataArray, salt: xr.DataArray) -> tuple[xr.DataArra
     return g2g, salt
 
 
+def _max_filter_with_nan(data: np.ndarray, radius: int) -> np.ndarray:
+    """Apply a square max filter while preserving NaN as no-data."""
+    if radius <= 0:
+        return data
+
+    rows, cols = data.shape
+    padded = np.pad(data, radius, mode="constant", constant_values=np.nan)
+    data_for_max = np.where(np.isfinite(padded), padded, -np.inf)
+
+    shifted_views = []
+    for dy in range(-radius, radius + 1):
+        for dx in range(-radius, radius + 1):
+            row_start = radius + dy
+            col_start = radius + dx
+            shifted_views.append(
+                data_for_max[row_start:row_start + rows, col_start:col_start + cols]
+            )
+
+    filtered = np.maximum.reduce(shifted_views)
+    filtered[filtered == -np.inf] = np.nan
+    return filtered
+
+
+def thicken_raster_lines(data: np.ndarray, radius: float = 1.0) -> np.ndarray:
+    """Visually thicken thin raster features; supports fractional radius values."""
+    if radius <= 0:
+        return data
+
+    lower_radius = int(np.floor(radius))
+    fraction = radius - lower_radius
+
+    lower = _max_filter_with_nan(data, lower_radius)
+    if fraction == 0:
+        return lower
+
+    upper = _max_filter_with_nan(data, lower_radius + 1)
+    return np.where(np.isfinite(lower), lower + (upper - lower) * fraction, upper)
+
+
 def create_animation(
     region_name: str,
     year: str,
@@ -196,8 +235,11 @@ def create_animation(
         float(gbr4_salt_zoom.latitude.max().values),
     )
 
+    # Visual-only setting: supports fractional values (e.g., 0.5 for subtler thickening).
+    flow_line_thickness_px = 0.5
+
     im_river_flow = plt.imshow(
-        g2g_zoom[0].values,
+        thicken_raster_lines(g2g_zoom[0].values, radius=flow_line_thickness_px),
         cmap=transparent_cmap,
         norm=norm,
         extent=extent_g2g,
@@ -316,7 +358,9 @@ def create_animation(
                     sys.stdout.write(message)
                 date_str_i = pd.to_datetime(str(dates[i])).strftime("%Y-%m-%d")
                 date_text.set_text(date_str_i)
-                im_river_flow.set_array(g2g_zoom[i].values)
+                im_river_flow.set_array(
+                    thicken_raster_lines(g2g_zoom[i].values, radius=flow_line_thickness_px)
+                )
                 im_salt.set_array(gbr4_salt_zoom[i].values)
                 return [im_river_flow, im_salt, date_text]
 
@@ -403,7 +447,7 @@ def main() -> None:
 
     g2g_data, gbr4_salt = normalize_coords(g2g_data, gbr4_salt)
 
-    color_ramp = np.array(["#f7fbff00", "#4e95beff", "#03407eff", "#000000ff"])
+    color_ramp = np.array(["#f7fbff00", "#4e95beff", "#03407eff", "#021e44ff"])
     cmap = colors.LinearSegmentedColormap.from_list("", color_ramp)
     colors_ramp = cmap(np.arange(cmap.N))
     colors_ramp[: int(1e-1 * cmap.N), -1] = 0
