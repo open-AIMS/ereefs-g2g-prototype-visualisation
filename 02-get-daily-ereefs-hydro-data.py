@@ -67,26 +67,27 @@ east = 155.8
 destination_folder = os.path.join("src-data", "eReefs-hydro")
 
 # depth layer to download
-depth = -2.35
+depth = -1.5
 
-# for reference (GBR4)
+# for reference (GBR4 v4) — verified against remote zc coordinate 2026-03-20
 gbr4_depth_to_k_table = {
-    -0.5: 15,
-    -2.35: 14,
-    -5.25: 13,
-    -9: 12,
-    -13: 11,
-    -18: 10,
-    -24: 9,
-    -31: 8,
+    -0.5: 16,
+    -1.5: 15,
+    -3.0: 14,
+    -5.55: 13,
+    -8.8: 12,
+    -12.75: 11,
+    -17.75: 10,
+    -23.75: 9,
+    -31.0: 8,
     -39.5: 7,
-    -49: 6,
+    -49.0: 6,
     -60.0: 5,
     -73.0: 4,
     -88.0: 3,
     -103.0: 2,
     -120.0: 1,
-    -140.0: 0
+    -145.0: 0,
 }
 
 k = gbr4_depth_to_k_table.get(depth, None)
