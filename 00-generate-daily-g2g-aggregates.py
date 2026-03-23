@@ -200,7 +200,7 @@ def main() -> None:
             start_ts,
             end_ts,
         ):
-            output_file = year_output_dir / f"sidb2netcdf_{VAR_NAME}_daily_{date_str}.nc"
+            output_file = year_output_dir / f"BOM_eReefs-{VAR_NAME}_daily_{date_str}.nc"
 
             if output_file.exists():
                 total_skipped += 1
