@@ -303,7 +303,7 @@ def create_animation(
     today_str = datetime.now().strftime("%d-%b-%Y")
     metadata_text = (
         f"Map generation: AIMS {today_str}\n"
-        f"Data: BOM G2G (DOI: <insert DOI here>), eReefs CSIRO GBR4 Hydrodynamic Model v4 "
+        f"Data: BOM G2G (DOI: 10.26274/0K5S-5E13), eReefs CSIRO GBR4 Hydrodynamic Model v4 "
         f"(AIMS daily aggregate product, DOI: 10.26274/Y74K-T032)\n"
         f"Licensing: Creative Commons Attribution 4.0 International "
         f"(https://creativecommons.org/licenses/by/4.0/)"
