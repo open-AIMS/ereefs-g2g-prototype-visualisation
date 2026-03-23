@@ -35,29 +35,46 @@ DATA_BOUNDS = {
 
 ZOOM_REGIONS = {
     "queensland": {
-        "north": -10.65,
-        "south": -29.30,
-        "west": 141.8,
-        "east": 155.8,
+        "bounding_box": {
+            "north": -10.65,
+            "south": -29.30,
+            "west": 141.8,
+            "east": 155.8,
+        },
+        "zoom_level": 1,
     },
     "north": {
-        "north": -10.65,
-        "south": -21.5,
-        "west": 141.8,
-        "east": 149.9,
+        "bounding_box": {
+            "north": -10.65,
+            "south": -21.5,
+            "west": 141.8,
+            "east": 149.9,
+        },
+        "zoom_level": 2,
     },
     "central": {
-        "north": -15.1,
-        "south": -25.03,
-        "west": 145.15,
-        "east": 152.57,
+        "bounding_box": {
+            "north": -15.1,
+            "south": -25.03,
+            "west": 145.15,
+            "east": 152.57,
+        },
+        "zoom_level": 2,
     },
     "south": {
-        "north": -18.95,
-        "south": -28.702,
-        "west": 148.45,
-        "east": 155.8,
+        "bounding_box": {
+            "north": -18.95,
+            "south": -28.702,
+            "west": 148.45,
+            "east": 155.8,
+        },
+        "zoom_level": 2,
     },
+}
+
+FLOW_LINE_THICKNESS_BY_ZOOM_LEVEL = {
+    1: 0.5,
+    2: 0.05,
 }
 
 
@@ -97,8 +114,17 @@ def _max_filter_with_nan(data: np.ndarray, radius: int) -> np.ndarray:
     return filtered
 
 
+def _blend_with_nan(lower: np.ndarray, upper: np.ndarray, fraction: float) -> np.ndarray:
+    """Blend two rasters while preserving no-data masks."""
+    lower_filled = np.where(np.isfinite(lower), lower, 0.0)
+    upper_filled = np.where(np.isfinite(upper), upper, 0.0)
+    blended = lower_filled + (upper_filled - lower_filled) * fraction
+    has_data = np.isfinite(lower) | np.isfinite(upper)
+    return np.where(has_data, blended, np.nan)
+
+
 def thicken_raster_lines(data: np.ndarray, radius: float = 1.0) -> np.ndarray:
-    """Visually thicken thin raster features; supports fractional radius values."""
+    """Visually thicken raster lines; supports fractional positive radius values."""
     if radius <= 0:
         return data
 
@@ -110,13 +136,14 @@ def thicken_raster_lines(data: np.ndarray, radius: float = 1.0) -> np.ndarray:
         return lower
 
     upper = _max_filter_with_nan(data, lower_radius + 1)
-    return np.where(np.isfinite(lower), lower + (upper - lower) * fraction, upper)
+    return _blend_with_nan(lower, upper, fraction)
 
 
 def create_animation(
     region_name: str,
     year: str,
     map_bounds: dict,
+    zoom_level: int,
     g2g_data: xr.DataArray,
     gbr4_salt: xr.DataArray,
     rivers: gpd.GeoDataFrame,
@@ -235,11 +262,13 @@ def create_animation(
         float(gbr4_salt_zoom.latitude.max().values),
     )
 
-    # Visual-only setting: supports fractional values (e.g., 0.5 for subtler thickening).
-    flow_line_thickness_px = 0.5
+    # Apply line thickening by zoom level.
+    flow_line_thickness_px = FLOW_LINE_THICKNESS_BY_ZOOM_LEVEL.get(zoom_level, 0.5)
+    print(f"Using flow line thickness {flow_line_thickness_px} px for zoom level {zoom_level}")
+    river_frame_0 = thicken_raster_lines(g2g_zoom[0].values, radius=flow_line_thickness_px)
 
     im_river_flow = plt.imshow(
-        thicken_raster_lines(g2g_zoom[0].values, radius=flow_line_thickness_px),
+        river_frame_0,
         cmap=transparent_cmap,
         norm=norm,
         extent=extent_g2g,
@@ -358,9 +387,11 @@ def create_animation(
                     sys.stdout.write(message)
                 date_str_i = pd.to_datetime(str(dates[i])).strftime("%Y-%m-%d")
                 date_text.set_text(date_str_i)
-                im_river_flow.set_array(
-                    thicken_raster_lines(g2g_zoom[i].values, radius=flow_line_thickness_px)
+                river_frame_i = thicken_raster_lines(
+                    g2g_zoom[i].values,
+                    radius=flow_line_thickness_px,
                 )
+                im_river_flow.set_array(river_frame_i)
                 im_salt.set_array(gbr4_salt_zoom[i].values)
                 return [im_river_flow, im_salt, date_text]
 
@@ -489,7 +520,9 @@ def main() -> None:
 
     for region_name in regions_to_process:
         if region_name in ZOOM_REGIONS:
-            bounds_to_use = ZOOM_REGIONS[region_name]
+            region_config = ZOOM_REGIONS[region_name]
+            bounds_to_use = region_config["bounding_box"]
+            zoom_level = region_config["zoom_level"]
         else:
             print(f"Warning: Unknown region '{region_name}'. Skipping.")
             continue
@@ -498,6 +531,7 @@ def main() -> None:
             region_name=region_name,
             year=year,
             map_bounds=bounds_to_use,
+            zoom_level=zoom_level,
             g2g_data=g2g_data,
             gbr4_salt=gbr4_salt,
             rivers=rivers,
