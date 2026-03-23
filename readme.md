@@ -109,8 +109,9 @@ libraries:
     - If no errors pop up after these import statements, it means the libraries are correctly installed.
 
 7. **Run the scripts in order**:
-  Run `01-download-base-map-data.py`, `02-get-daily-ereefs-hydro-data.py`, and then
-  `03-animate-G2G-and-salinity.py`.
+  First run the one-time preprocessing script `00-generate-daily-g2g-aggregates.py` to generate
+  daily aggregate G2G files for public hosting. Then run `01-download-base-map-data.py`,
+  `02-get-daily-ereefs-hydro-data.py`, and `03-animate-G2G-and-salinity.py`.
 
 8. **Deactivate the environment when done**:
     - When you're done working in the `ereefs_maps` environment, deactivate it with:
@@ -128,6 +129,34 @@ and so it is not scripted for automatic download. Once you have this dataset you
 data in `03-animate-G2G-and-salinity.py`. The base map data and the eReefs Hydro v2.0 data can be obtained by running
 data in `03-animate-G2G-and-salinity.py`. The base map data and the eReefs Hydro v4 data can be obtained by running
 the scripts `01-download-base-map-data.py` and `02-get-daily-ereefs-hydro-data.py`.
+
+### 00-generate-daily-g2g-aggregates.py
+
+This script is a one-time preprocessing step that converts the source hourly G2G files
+(`src-data/g2g-data/extracted_files/<year>/sidb2netcdf_g2gflow_YYYY-MM-DD.nc`) into
+daily mean NetCDF files. It writes one output file per day to:
+
+- `src-data/g2g-data/daily-aggregated/<year>/sidb2netcdf_g2gflow_daily_YYYY-MM-DD.nc`
+
+Features:
+
+- processes all available years by default (or selected years)
+- supports `--start-date` and `--end-date` filters
+- skips files that already exist (safe restart behaviour)
+- uses temporary output files (`.tmp.nc`) and atomic rename for robustness
+
+Example usage:
+
+```bash
+# Process all years found in src-data/g2g-data/extracted_files
+python 00-generate-daily-g2g-aggregates.py
+
+# Process selected years only
+python 00-generate-daily-g2g-aggregates.py 2019 2020
+
+# Process a date range
+python 00-generate-daily-g2g-aggregates.py --start-date 2019-01-01 --end-date 2019-12-31
+```
 
 ### 01-download-base-map-data.py
 

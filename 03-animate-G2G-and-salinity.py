@@ -445,7 +445,7 @@ def main() -> None:
     print(f"Regions: {', '.join(regions_to_process)}")
 
     var_name = "g2gflow"
-    g2g_root = "./src-data/g2g-data/extracted_files"
+    g2g_root = "./src-data/g2g-data/daily-aggregated"
     export_dir = "export"
     if not os.path.exists(export_dir):
         os.makedirs(export_dir)
@@ -465,11 +465,9 @@ def main() -> None:
     )
 
     print("Loading G2G data...")
-    g2g_nc_path = f"{g2g_root}/{year_str}/sidb2netcdf_{var_name}_20*.nc"
+    g2g_nc_path = f"{g2g_root}/{year_str}/sidb2netcdf_{var_name}_daily_20*.nc"
     g2g_ds = xr.open_mfdataset(g2g_nc_path)
-    g2g_data_raw = g2g_ds[var_name]
-    g2g_data_nans = g2g_data_raw.where(g2g_data_raw != -999.0)
-    g2g_data = g2g_data_nans.resample(time="1D", skipna=True).mean(skipna=True)
+    g2g_data = g2g_ds[var_name]
 
     print("Loading salinity data...")
     gbr4_salt_root = f"src-data/eReefs-hydro/GBR4_H2p0_salt_crop_{year_str}*.nc"
