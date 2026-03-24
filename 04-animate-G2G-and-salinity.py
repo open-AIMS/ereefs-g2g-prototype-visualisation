@@ -94,6 +94,17 @@ def normalize_coords(g2g: xr.DataArray, salt: xr.DataArray) -> tuple[xr.DataArra
     return g2g, salt
 
 
+def parse_preview_date(raw_value: str) -> pd.Timestamp:
+    """Parse preview date in either YYYY-MM-DD or DD/MM/YYYY format."""
+    value = raw_value.strip()
+    for fmt in ("%Y-%m-%d", "%d/%m/%Y"):
+        try:
+            return pd.Timestamp(datetime.strptime(value, fmt).date())
+        except ValueError:
+            continue
+    raise ValueError("Invalid --preview-date format. Use YYYY-MM-DD or DD/MM/YYYY.")
+
+
 def _max_filter_with_nan(data: np.ndarray, radius: int) -> np.ndarray:
     """Apply a square max filter while preserving NaN as no-data."""
     if radius <= 0:
@@ -160,6 +171,7 @@ def create_animation(
     export_dir: str,
     var_name: str,
     animate: bool,
+    preview_date: pd.Timestamp | None,
 ) -> None:
     """Render an animation or preview image for one region."""
     print(f"\n{'=' * 60}")
@@ -268,7 +280,23 @@ def create_animation(
     # Apply line thickening by zoom level.
     flow_line_thickness_px = FLOW_LINE_THICKNESS_BY_ZOOM_LEVEL.get(zoom_level, 0.5)
     print(f"Using flow line thickness {flow_line_thickness_px} px for zoom level {zoom_level}")
-    river_frame_0 = thicken_raster_lines(g2g_zoom[0].values, radius=flow_line_thickness_px)
+
+    preview_idx = 0
+    if not animate and preview_date is not None:
+        available_dates = pd.to_datetime(g2g_zoom.time.values).normalize()
+        matched_indices = np.where(available_dates == preview_date)[0]
+        if len(matched_indices) == 0:
+            print(
+                f"Preview date {preview_date.date()} not found for year {year}; "
+                "using first available date instead."
+            )
+        else:
+            preview_idx = int(matched_indices[0])
+
+    river_frame_0 = thicken_raster_lines(
+        g2g_zoom[preview_idx].values,
+        radius=flow_line_thickness_px,
+    )
 
     im_river_flow = plt.imshow(
         river_frame_0,
@@ -283,7 +311,7 @@ def create_animation(
     vmin_salt = 24.0
     vmax_salt = 37.0
     im_salt = plt.imshow(
-        gbr4_salt_zoom[0].values,
+        gbr4_salt_zoom[preview_idx].values,
         cmap=salt_cmap,
         vmin=vmin_salt,
         vmax=vmax_salt,
@@ -294,7 +322,7 @@ def create_animation(
     )
 
     dates = g2g_zoom.time.values
-    date_str = pd.to_datetime(str(dates[0])).strftime("%Y-%m-%d")
+    date_str = pd.to_datetime(str(dates[preview_idx])).strftime("%Y-%m-%d")
     ax_left = ax.get_position().x0
     ax_right = ax.get_position().x1
     region_label = region_name.capitalize()
@@ -438,6 +466,15 @@ def main() -> None:
         action="store_true",
         help="Save one preview PNG per region instead of MP4 animations.",
     )
+    parser.add_argument(
+        "--preview-date",
+        type=str,
+        default=None,
+        help=(
+            "Date used when --preview-image is set. "
+            "Supported formats: YYYY-MM-DD or DD/MM/YYYY."
+        ),
+    )
     args = parser.parse_args()
 
     year = args.year
@@ -449,10 +486,13 @@ def main() -> None:
         return
 
     animate = not args.preview_image
+    preview_date = parse_preview_date(args.preview_date) if args.preview_date else None
     regions_to_process = [region.strip() for region in args.regions.split(",") if region.strip()]
 
     print(f"Generating outputs for year {year}...")
     print(f"Regions: {', '.join(regions_to_process)}")
+    if preview_date is not None:
+        print(f"Preview date: {preview_date.date()}")
 
     var_name = "g2gflow"
     g2g_root = "./src-data/g2g-data/daily-aggregated"
@@ -572,6 +612,7 @@ def main() -> None:
             export_dir=export_dir,
             var_name=var_name,
             animate=animate,
+            preview_date=preview_date,
         )
 
     print(f"\n{'=' * 60}")
