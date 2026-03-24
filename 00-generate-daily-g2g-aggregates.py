@@ -18,6 +18,7 @@ import xarray as xr
 
 VAR_NAME = "g2gflow"
 NODATA_VALUE = -999.0
+EXCLUDED_YEARS = {"2012", "2014", "2016", "2020", "2022", "2023"}
 
 
 def parse_args() -> argparse.Namespace:
@@ -66,10 +67,20 @@ def parse_args() -> argparse.Namespace:
 def discover_years(input_root: Path, requested_years: list[str]) -> list[str]:
     """Resolve which year folders should be processed."""
     if requested_years:
-        return sorted(requested_years)
+        years = sorted(requested_years)
+    else:
+        years = [d.name for d in input_root.iterdir() if d.is_dir() and d.name.isdigit()]
+        years = sorted(years)
 
-    years = [d.name for d in input_root.iterdir() if d.is_dir() and d.name.isdigit()]
-    return sorted(years)
+    filtered_years = [year for year in years if year not in EXCLUDED_YEARS]
+    skipped_years = [year for year in years if year in EXCLUDED_YEARS]
+    if skipped_years:
+        print(
+            "Skipping excluded year(s) due to known G2G data issue: "
+            f"{', '.join(skipped_years)}"
+        )
+
+    return filtered_years
 
 
 def build_file_pattern() -> re.Pattern[str]:

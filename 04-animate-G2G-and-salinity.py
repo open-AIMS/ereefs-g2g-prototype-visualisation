@@ -78,6 +78,8 @@ FLOW_LINE_THICKNESS_BY_ZOOM_LEVEL = {
     2: 0.05,
 }
 
+EXCLUDED_YEARS = {"2012", "2014", "2016", "2020", "2022", "2023"}
+
 
 def normalize_coords(g2g: xr.DataArray, salt: xr.DataArray) -> tuple[xr.DataArray, xr.DataArray]:
     """Ensure coordinate axes are ascending for consistent geospatial plotting."""
@@ -439,6 +441,13 @@ def main() -> None:
     args = parser.parse_args()
 
     year = args.year
+    if year in EXCLUDED_YEARS:
+        print(
+            "Skipping excluded year from publication "
+            f"(flow areas >10 cumecs were set to null during export): {year}"
+        )
+        return
+
     animate = not args.preview_image
     regions_to_process = [region.strip() for region in args.regions.split(",") if region.strip()]
 

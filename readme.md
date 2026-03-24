@@ -34,6 +34,22 @@ from [eReefs Basemap - GIS layers Reefs, Rivers, Cities, Basins, Countries (AIMS
 The eReefs data used to generate these plots comes from the GBR4 v4 daily OpenDAP endpoint:
 https://thredds.ereefs.aims.gov.au/thredds/dodsC/gbr4_v4/daily.nc
 
+## Known G2G data quality exclusions
+
+Some of the modelled years are excluded from this publication due to a known
+issue in the exported G2G data:
+
+- `2012`, `2014`, `2016`, `2020`, `2022`, `2023`
+
+Issue summary:
+
+- Flow areas with greater than `10` cumecs were set to null values during
+  export.
+- This makes these data files unsuitable for reuse.
+
+To avoid producing misleading outputs, the scripts now skip these years by
+default or return early when requested explicitly.
+
 ## License
 
 This code is made available under an MIT license and the plots are make available under a Creative Commons Attribution
@@ -136,7 +152,7 @@ This script is a one-time preprocessing step that converts the source hourly G2G
 (`src-data/g2g-data/extracted_files/<year>/sidb2netcdf_g2gflow_YYYY-MM-DD.nc`) into
 daily mean NetCDF files. It writes one output file per day to:
 
-- `src-data/g2g-data/daily-aggregated/<year>/sidb2netcdf_g2gflow_daily_YYYY-MM-DD.nc`
+- `src-data/g2g-data/daily-aggregated/<year>/BOM_eReefs-g2gflow_daily_YYYY-MM-DD.nc`
 
 Features:
 
@@ -192,11 +208,11 @@ This takes about 1-2 sec per day to download and 6.2 MB per day.
 
 This script downloads daily aggregated G2G NetCDF files for a selected year from:
 
-- `https://nextcloud.eatlas.org.au/s/LiRXpzLFBCWPf4f/{year}/download`
+- `https://nextcloud.eatlas.org.au/s/LiRXpzLFBCWPf4f/download?path=%2F{year}`
 
 It extracts only files matching:
 
-- `sidb2netcdf_g2gflow_daily_*.nc`
+- `BOM_eReefs-g2gflow_daily_*.nc`
 
 to:
 
