@@ -5,6 +5,7 @@ and eReefs GBR4 Hydro salinity data. It combines the previous separate full and
 zoom scripts into one entry point.
 """
 import argparse
+import glob
 import os
 import sys
 from datetime import datetime
@@ -465,13 +466,32 @@ def main() -> None:
     )
 
     print("Loading G2G data...")
-    g2g_nc_path = f"{g2g_root}/{year_str}/sidb2netcdf_{var_name}_daily_20*.nc"
-    g2g_ds = xr.open_mfdataset(g2g_nc_path)
+    g2g_pattern = f"{g2g_root}/{year_str}/BOM_eReefs-{var_name}_daily_{year_str}-*.nc"
+    g2g_files = sorted(glob.glob(g2g_pattern))
+
+    if not g2g_files:
+        raise FileNotFoundError(
+            "No daily G2G files found for year "
+            f"{year_str}. Run 03-download-daily-g2g-data.py {year_str} first."
+        )
+
+    g2g_ds = xr.open_mfdataset(g2g_files, combine="by_coords")
     g2g_data = g2g_ds[var_name]
 
     print("Loading salinity data...")
     gbr4_salt_root = f"src-data/eReefs-hydro/GBR4_H2p0_salt_crop_{year_str}*.nc"
-    gbr4_salt_ds = xr.open_mfdataset(gbr4_salt_root, combine="nested", concat_dim="time")
+    gbr4_salt_files = sorted(glob.glob(gbr4_salt_root))
+    if not gbr4_salt_files:
+        raise FileNotFoundError(
+            "No eReefs Hydro salinity files found for year "
+            f"{year_str}. Run 02-get-daily-ereefs-hydro-data.py {year_str} first."
+        )
+
+    gbr4_salt_ds = xr.open_mfdataset(
+        gbr4_salt_files,
+        combine="nested",
+        concat_dim="time",
+    )
     gbr4_salt = gbr4_salt_ds["salt"]
 
     g2g_data, gbr4_salt = normalize_coords(g2g_data, gbr4_salt)

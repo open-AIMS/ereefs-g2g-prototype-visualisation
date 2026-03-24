@@ -111,7 +111,8 @@ libraries:
 7. **Run the scripts in order**:
   First run the one-time preprocessing script `00-generate-daily-g2g-aggregates.py` to generate
   daily aggregate G2G files for public hosting. Then run `01-download-base-map-data.py`,
-  `02-get-daily-ereefs-hydro-data.py`, and `03-animate-G2G-and-salinity.py`.
+  `02-get-daily-ereefs-hydro-data.py`, `03-download-daily-g2g-data.py`, and
+  `04-animate-G2G-and-salinity.py`.
 
 8. **Deactivate the environment when done**:
     - When you're done working in the `ereefs_maps` environment, deactivate it with:
@@ -124,10 +125,9 @@ That's it! You now have a virtual environment set up in Anaconda on Windows.
 
 ## Overview of scripts
 
-Prior to reproducing the plots you will need to obtain a copy of the draft G2G BOM dataset. This data is not yet public
-and so it is not scripted for automatic download. Once you have this dataset you will need to adjust the path to this
-data in `03-animate-G2G-and-salinity.py`. The base map data and the eReefs Hydro v2.0 data can be obtained by running
-data in `03-animate-G2G-and-salinity.py`. The base map data and the eReefs Hydro v4 data can be obtained by running
+Prior to reproducing the plots you will need access to daily aggregated G2G NetCDF files. This repository now includes
+an automated download step for those files using `03-download-daily-g2g-data.py`. The base map data and the eReefs
+Hydro v4 data can be obtained by running
 the scripts `01-download-base-map-data.py` and `02-get-daily-ereefs-hydro-data.py`.
 
 ### 00-generate-daily-g2g-aggregates.py
@@ -188,7 +188,27 @@ then restarted, any data file that has already been downloaded will be not be re
 
 This takes about 1-2 sec per day to download and 6.2 MB per day.
 
-### 03-animate-G2G-and-salinity.py
+### 03-download-daily-g2g-data.py
+
+This script downloads daily aggregated G2G NetCDF files for a selected year from:
+
+- `https://nextcloud.eatlas.org.au/s/LiRXpzLFBCWPf4f/{year}/download`
+
+It extracts only files matching:
+
+- `sidb2netcdf_g2gflow_daily_*.nc`
+
+to:
+
+- `src-data/g2g-data/daily-aggregated/<year>/`
+
+Example usage:
+
+```bash
+python 03-download-daily-g2g-data.py 2019
+```
+
+### 04-animate-G2G-and-salinity.py
 
 This script combines the G2G data with eReefs Hydro salinity into a single visualisation. It now supports multiple
 regions from one entry point using:
@@ -207,8 +227,8 @@ Additional behaviour now implemented in the script:
   thickness values (for example `0.5`)
 
 This script is designed to generate animations for a selected year, noting that matching salinity data must first be
-downloaded using `02-get-daily-ereefs-hydro-data.py`. It uses test G2G model data from BOM, which is not yet publicly
-available.
+downloaded using `02-get-daily-ereefs-hydro-data.py` and daily G2G NetCDF files must be downloaded using
+`03-download-daily-g2g-data.py`.
 
 ## Initial script development notes and the use of assisted coding with GPT-4
 
@@ -250,7 +270,7 @@ file. The other problem was the bounding box selection. GPT4 generated code with
 files. I added code to allow better restarting of the download, by first downloading to a temporary file, then moving as
 a last step. It also skips files that are already downloaded.
 
-### 03-animate-G2G-and-salinity.py prompt
+### 04-animate-G2G-and-salinity.py prompt
 
 This script was mainly based on an extension of a originally script developed by Ben Farmer. Various adjustments were
 made with the help of GPT-4, however this code was a bit big for it to handle.
