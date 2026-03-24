@@ -15,7 +15,7 @@ from pathlib import Path
 
 
 BASE_URL_TEMPLATE = (
-    "https://nextcloud.eatlas.org.au/s/LiRXpzLFBCWPf4f/download?path=%2F{year}"
+    "https://nextcloud.eatlas.org.au/s/LiRXpzLFBCWPf4f/download?path=%2Fdaily%2Fg2gflow-data%2F{year}"
 )
 EXCLUDED_YEARS = {"2012", "2014", "2016", "2020", "2022", "2023"}
 

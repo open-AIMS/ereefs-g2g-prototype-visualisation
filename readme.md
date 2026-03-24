@@ -208,7 +208,7 @@ This takes about 1-2 sec per day to download and 6.2 MB per day.
 
 This script downloads daily aggregated G2G NetCDF files for a selected year from:
 
-- `https://nextcloud.eatlas.org.au/s/LiRXpzLFBCWPf4f/download?path=%2F{year}`
+- `https://nextcloud.eatlas.org.au/s/LiRXpzLFBCWPf4f/download?path=%2Fdaily%2Fg2gflow-data%2F{year}`
 
 It extracts only files matching:
 
