@@ -32,6 +32,15 @@ This web storage location includes both the visualisation products and the daily
 
 ![Preview map of this visualisation showing land runoff and its effect on marine salinity (2019-02-06)](preview-image-2019-02-06.png)
 
+## Quick note: Batch bash scripts
+
+If you want end-to-end automation, use the batch scripts:
+
+- `generate-and-publish-daily-g2g.sh` for daily G2G generation + S3 publishing
+- `generate-all-videos.sh` for annual video generation
+
+For required environment variables and `.env` setup, jump to **Batch helper scripts** below.
+
 ## Source data
 
 The basemap data used in these plots is available
@@ -251,6 +260,82 @@ Additional behaviour now implemented in the script:
 This script is designed to generate animations for a selected year, noting that matching salinity data must first be
 downloaded using `02-get-daily-ereefs-hydro-data.py` and daily G2G NetCDF files must be downloaded using
 `03-download-daily-g2g-data.py`.
+
+## Batch helper scripts
+
+The repository also includes two shell scripts for end-to-end batch processing.
+
+### Environment configuration (.env)
+
+An example environment file is provided as `.env.example`.
+
+Recommended setup:
+
+```bash
+cp .env.example .env
+# Edit .env with your local/project values
+```
+
+Before running either helper script, load variables from `.env` into your shell:
+
+```bash
+set -a
+source .env
+set +a
+```
+
+### generate-and-publish-daily-g2g.sh
+
+Builds daily G2G NetCDF aggregates from source tar archives in S3 and uploads the generated daily files to a public S3
+prefix.
+
+Defaults:
+
+- processes all years from `2011` to `2023` when no year arguments are provided
+- removes temporary/downloaded local files after each year (`KEEP_LOCAL=false` by default)
+
+Prerequisites:
+
+- AWS CLI installed and authenticated
+- permission to read source bucket and write destination prefix
+- required environment variables:
+  - `SOURCE_S3_PREFIX`
+  - `DEST_S3_PREFIX`
+  - `SOURCE_AWS_PROFILE`
+  - `DEST_AWS_PROFILE`
+
+Usage examples:
+
+```bash
+# Process all years (2011-2023)
+bash generate-and-publish-daily-g2g.sh
+
+# Process selected years only
+bash generate-and-publish-daily-g2g.sh 2019 2021
+
+# Keep local extracted and generated files after upload
+KEEP_LOCAL=true bash generate-and-publish-daily-g2g.sh 2019
+```
+
+### generate-all-videos.sh
+
+Runs the full video-generation workflow for a configured year range.
+
+For each included year it:
+
+- downloads eReefs Hydro salinity
+- downloads daily G2G data
+- renders animations
+- deletes downloaded per-year data afterward to save disk space
+
+Usage:
+
+```bash
+# Requires YEAR_START and YEAR_END in environment
+bash generate-all-videos.sh
+```
+
+The final videos can be found in the `./export` folder.
 
 ## Initial script development notes and the use of assisted coding with GPT-4
 
