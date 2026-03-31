@@ -5,3 +5,7 @@ test.log
 .idea
 .vscode
 .history
+__pycache__
+.env
+.env.*
+!.env.example

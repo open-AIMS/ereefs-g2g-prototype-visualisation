@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-# Required environment variables:
+ # Required environment variables:
 #   YEAR_START     (for example: 2011)
 #   YEAR_END       (for example: 2023)
 : "${YEAR_START:?Environment variable YEAR_START is required}"
@@ -10,8 +10,14 @@ set -euo pipefail
 echo "Downloading base map data (Step 1)..."
 python3 01-download-base-map-data.py
 
-for YEAR in $(seq "$YEAR_START" "$YEAR_END"); do
-    echo "Processing year $YEAR..."
+if [[ "$#" -eq 0 ]]; then
+    YEARS=$(seq "$YEAR_START" "$YEAR_END")
+else
+    YEARS=("$@")
+fi
+
+for YEAR in ${YEARS[@]}; do
+        echo "Processing year $YEAR..."
 
     echo "Step 2: Downloading eReefs Hydro salinity for $YEAR"
     python3 02-get-daily-ereefs-hydro-data.py "$YEAR"

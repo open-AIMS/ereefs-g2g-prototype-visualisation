@@ -11,7 +11,10 @@ set -euo pipefail
 : "${SOURCE_AWS_PROFILE:?Environment variable SOURCE_AWS_PROFILE is required}"
 : "${DEST_AWS_PROFILE:?Environment variable DEST_AWS_PROFILE is required}"
 
+
+# Normalize S3 prefixes to avoid accidental double slashes
 SOURCE_S3_PREFIX="${SOURCE_S3_PREFIX%/}"
+DEST_S3_PREFIX="${DEST_S3_PREFIX%/}"
 
 TEMP_DIR="./src-data/g2g-data/temp_s3_files"
 EXTRACTED_ROOT="./src-data/g2g-data/extracted_files"

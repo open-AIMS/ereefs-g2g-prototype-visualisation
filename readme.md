@@ -37,7 +37,7 @@ This web storage location includes both the visualisation products and the daily
 If you want end-to-end automation, use the batch scripts:
 
 - `generate-and-publish-daily-g2g.sh` for daily G2G generation + S3 publishing
-- `generate-all-videos.sh` for annual video generation
+- `generate-videos.sh` for annual video generation
 
 For required environment variables and `.env` setup, jump to **Batch helper scripts** below.
 
@@ -317,7 +317,7 @@ bash generate-and-publish-daily-g2g.sh 2019 2021
 KEEP_LOCAL=true bash generate-and-publish-daily-g2g.sh 2019
 ```
 
-### generate-all-videos.sh
+### generate-videos.sh
 
 Runs the full video-generation workflow for a configured year range.
 
@@ -331,8 +331,11 @@ For each included year it:
 Usage:
 
 ```bash
-# Requires YEAR_START and YEAR_END in environment
-bash generate-all-videos.sh
+# Process all years in the configured range (YEAR_START to YEAR_END)
+bash generate-videos.sh
+
+# Process only selected years (e.g. 2019 and 2021)
+bash generate-videos.sh 2019 2021
 ```
 
 The final videos can be found in the `./export` folder.
