@@ -126,7 +126,11 @@ for i, date in enumerate(dates):
         print(f'Skipping data for {date} ({i+1}/{len(dates)}) file already exists')
     else:
         print(f'Downloading data for {date} ({i+1}/{len(dates)})')
-        salt = ds['salt'].sel(k=k, time=date)
+        try:
+            salt = ds['salt'].sel(k=k, time=date)
+        except KeyError as e:
+            print(f'\nERROR: Timestamp {date} not found in {url}')
+            raise
         salt = salt.sel(latitude=slice(south, north), longitude=slice(west, east))
 
         # Use a temporary file then rename to make the script more robust to cancellation and restart
