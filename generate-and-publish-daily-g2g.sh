@@ -42,7 +42,7 @@ for YEAR in "${YEARS[@]}"; do
 
   log "Downloading source archives from $SOURCE_S3_PREFIX for year $YEAR"
   aws --profile "$SOURCE_AWS_PROFILE" s3 cp "$SOURCE_S3_PREFIX/" "$TEMP_DIR/" \
-    --recursive --exclude "*" --include "*$YEAR*.tar.gz"
+    --recursive --exclude "*" --include "*$YEAR*.tar.gz" --exclude "*DEPRECATED*"
 
   shopt -s nullglob
   archives=("$TEMP_DIR"/*.tar.gz)

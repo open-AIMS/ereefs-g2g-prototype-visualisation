@@ -18,7 +18,8 @@ import xarray as xr
 
 VAR_NAME = "g2gflow"
 NODATA_VALUE = -999.0
-EXCLUDED_YEARS = {"2012", "2014", "2016", "2020", "2022", "2023"}
+#EXCLUDED_YEARS = {"2012", "2014", "2016", "2020", "2022", "2023"}
+EXCLUDED_YEARS = {}
 
 
 def parse_args() -> argparse.Namespace:
