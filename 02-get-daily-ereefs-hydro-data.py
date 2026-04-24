@@ -18,7 +18,7 @@ import pandas as pd
 import os
 import argparse
 
-EXCLUDED_YEARS = {"2012", "2014", "2016", "2020", "2022", "2023"}
+EXCLUDED_YEARS = {}
 
 # Create the argument parser
 parser = argparse.ArgumentParser(description="Download surface (-2.35 m) Salinity (salt) from the GBR4 AIMS eReefs "
@@ -43,10 +43,7 @@ parser.add_argument(
 args = parser.parse_args()
 
 if args.year in EXCLUDED_YEARS:
-    print(
-        "Skipping excluded year from publication "
-        f"(flow areas >10 cumecs were set to null during export): {args.year}"
-    )
+    print(f"Skipping excluded year from publication: {args.year}")
     sys.exit(0)
 
 # specify the URL of the OpenDAP endpoint

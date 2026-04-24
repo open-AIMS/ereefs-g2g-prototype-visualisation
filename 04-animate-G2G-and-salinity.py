@@ -78,7 +78,7 @@ FLOW_LINE_THICKNESS_BY_ZOOM_LEVEL = {
     2: 0.05,
 }
 
-EXCLUDED_YEARS = {"2012", "2014", "2016", "2020", "2022", "2023"}
+EXCLUDED_YEARS = {}
 
 
 def normalize_coords(g2g: xr.DataArray, salt: xr.DataArray) -> tuple[xr.DataArray, xr.DataArray]:
@@ -479,10 +479,7 @@ def main() -> None:
 
     year = args.year
     if year in EXCLUDED_YEARS:
-        print(
-            "Skipping excluded year from publication "
-            f"(flow areas >10 cumecs were set to null during export): {year}"
-        )
+        print(f"Skipping excluded year from publication: {year}")
         return
 
     animate = not args.preview_image

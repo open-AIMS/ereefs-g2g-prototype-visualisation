@@ -18,7 +18,7 @@ import xarray as xr
 
 VAR_NAME = "g2gflow"
 NODATA_VALUE = -999.0
-EXCLUDED_YEARS = {"2012", "2014", "2016", "2020", "2022", "2023"}
+EXCLUDED_YEARS = {}
 
 
 def parse_args() -> argparse.Namespace:
@@ -75,10 +75,7 @@ def discover_years(input_root: Path, requested_years: list[str]) -> list[str]:
     filtered_years = [year for year in years if year not in EXCLUDED_YEARS]
     skipped_years = [year for year in years if year in EXCLUDED_YEARS]
     if skipped_years:
-        print(
-            "Skipping excluded year(s) due to known G2G data issue: "
-            f"{', '.join(skipped_years)}"
-        )
+        print(f"Skipping excluded year(s): {', '.join(skipped_years)}")
 
     return filtered_years
 

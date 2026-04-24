@@ -49,21 +49,6 @@ from [eReefs Basemap - GIS layers Reefs, Rivers, Cities, Basins, Countries (AIMS
 The eReefs data used to generate these plots comes from the GBR4 v4 daily OpenDAP endpoint:
 https://thredds.ereefs.aims.gov.au/thredds/dodsC/gbr4_v4/daily.nc
 
-## Known G2G data quality exclusions
-
-Some of the modelled years are excluded from this publication due to a known
-issue in the exported G2G data:
-
-- `2012`, `2014`, `2016`, `2020`, `2022`, `2023`
-
-Issue summary:
-
-- Flow areas with greater than `10` cumecs were set to null values during
-  export.
-- This makes these data files unsuitable for reuse.
-
-To avoid producing misleading outputs, the scripts now skip these years by
-default or return early when requested explicitly.
 
 ## License
 
