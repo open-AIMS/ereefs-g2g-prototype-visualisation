@@ -17,7 +17,6 @@ from pathlib import Path
 BASE_URL_TEMPLATE = (
     "https://nextcloud.eatlas.org.au/s/LiRXpzLFBCWPf4f/download?path=%2Fdaily%2Fg2gflow-data%2F{year}"
 )
-#EXCLUDED_YEARS = {"2012", "2014", "2016", "2020", "2022", "2023"}
 EXCLUDED_YEARS = {}
 
 DAILY_FILE_PATTERN = re.compile(
@@ -89,10 +88,7 @@ def main() -> None:
 
     year = args.year
     if year in EXCLUDED_YEARS:
-        print(
-            "Skipping excluded year from publication "
-            f"(flow areas >10 cumecs were set to null during export): {year}"
-        )
+        print(f"Skipping excluded year from publication: {year}")
         return
 
     url = BASE_URL_TEMPLATE.format(year=year)

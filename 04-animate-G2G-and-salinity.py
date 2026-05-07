@@ -78,7 +78,6 @@ FLOW_LINE_THICKNESS_BY_ZOOM_LEVEL = {
     2: 0.05,
 }
 
-#EXCLUDED_YEARS = {"2012", "2014", "2016", "2020", "2022", "2023"}
 EXCLUDED_YEARS = {}
 
 
@@ -480,10 +479,7 @@ def main() -> None:
 
     year = args.year
     if year in EXCLUDED_YEARS:
-        print(
-            "Skipping excluded year from publication "
-            f"(flow areas >10 cumecs were set to null during export): {year}"
-        )
+        print(f"Skipping excluded year from publication: {year}")
         return
 
     animate = not args.preview_image
@@ -553,12 +549,12 @@ def main() -> None:
     transparent_cmap = colors.ListedColormap(colors_ramp)
 
     salt_color_ramp = [
-        "#5c0035", "#7a002f", "#89002d", "#98002a", "#a60027", "#b30224",
-        "#ba0821", "#c8141a", "#cf1a17", "#d62014", "#dd2610", "#eb3209",
-        "#f93e03", "#ff4500", "#ff4e00", "#ff5700", "#ff6000", "#ff7c00",
-        "#ff8500", "#ff9009", "#ffa620", "#ffb12b", "#ffc540", "#ffcb47",
-        "#ffd14d", "#ffd754", "#ffdc5b", "#ffe262", "#ffee6f", "#fff372",
-        "#fff873", "#fffd74", "#f1ffa0", "#d4ffdb", "#9cf9dc", "#62e6da",
+        "#5c0035", "#7a002f", "#89002d", "#98002a", "#a60027", "#b30224", 
+        "#ba0821", "#c8141a", "#cf1a17", "#d62014", "#dd2610", "#eb3209", 
+        "#f93e03", "#ff4500", "#ff4e00", "#ff5700", "#ff6000", "#ff7c00", 
+        "#ff8500", "#ff9009", "#ffa620", "#ffb12b", "#ffc540", "#ffcb47", 
+        "#ffd14d", "#ffd754", "#ffdc5b", "#ffe262", "#ffee6f", "#fff372", 
+        "#fff873", "#fffd74", "#f1ffa0", "#d4ffdb", "#9cf9dc", "#62e6da", 
         "#39cae2", "#358cf6", "#3146f0", "#3a0db2", "#3a128e", "#380060",
     ]
 

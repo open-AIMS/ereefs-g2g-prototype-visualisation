@@ -2,8 +2,8 @@
 Eric Lawrey, Marc Hammerton - Australian Institute of Marine Science
 This script downloads surface (-2.35 m) Salinity (salt) from the GBR4 AIMS
 eReefs THREDDS data service. The data is cropped to the specified bounding
-box to reduce the total amount of data. This bounding box was chosen to
-align with the G2G test data corresponding to the southern region of the
+box to reduce the total amount of data. This bounding box was chosen to 
+align with the G2G test data corresponding to the southern region of the 
 GBR.
 
 This script is designed to cope with cancellation and resumption. If a
@@ -18,7 +18,6 @@ import pandas as pd
 import os
 import argparse
 
-#EXCLUDED_YEARS = {"2012", "2014", "2016", "2020", "2022", "2023"}
 EXCLUDED_YEARS = {}
 
 # Create the argument parser
@@ -44,10 +43,7 @@ parser.add_argument(
 args = parser.parse_args()
 
 if args.year in EXCLUDED_YEARS:
-    print(
-        "Skipping excluded year from publication "
-        f"(flow areas >10 cumecs were set to null during export): {args.year}"
-    )
+    print(f"Skipping excluded year from publication: {args.year}")
     sys.exit(0)
 
 # specify the URL of the OpenDAP endpoint
@@ -73,7 +69,7 @@ south = -29.30
 west = 141.8
 east = 155.8
 
-# folder to save the downloaded data to
+# folder to save the downloaded data to 
 destination_folder = os.path.join("src-data", "eReefs-hydro")
 
 # depth layer to download
@@ -107,7 +103,7 @@ if k is None:
 
 if not os.path.exists(destination_folder):
         os.makedirs(destination_folder)
-
+        
 # open the remote dataset
 ds = xr.open_dataset(url)
 
@@ -115,24 +111,20 @@ ds = xr.open_dataset(url)
 for i, date in enumerate(dates):
     filename = os.path.join(destination_folder, f'GBR4_H2p0_salt_crop_{date.strftime("%Y-%m-%d")}.nc')
     filename_tmp = f'{filename}.tmp'
-
+    
     # Clean up any temp files left over from previous runs
     if os.path.exists(filename_tmp):
         print('Removing temporary file')
         os.remove(filename_tmp)
-
+        
     # Support cancellations and restarts
     if os.path.exists(filename):
         print(f'Skipping data for {date} ({i+1}/{len(dates)}) file already exists')
     else:
         print(f'Downloading data for {date} ({i+1}/{len(dates)})')
-        try:
-            salt = ds['salt'].sel(k=k, time=date)
-        except KeyError as e:
-            print(f'\nERROR: Timestamp {date} not found in {url}')
-            raise
+        salt = ds['salt'].sel(k=k, time=date)
         salt = salt.sel(latitude=slice(south, north), longitude=slice(west, east))
-
+        
         # Use a temporary file then rename to make the script more robust to cancellation and restart
         salt.to_netcdf(filename_tmp)
         os.rename(filename_tmp, filename)
