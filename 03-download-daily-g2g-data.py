@@ -15,7 +15,7 @@ from pathlib import Path
 
 
 BASE_URL_TEMPLATE = (
-    "https://nextcloud.eatlas.org.au/s/LiRXpzLFBCWPf4f/download?path=%2Fdaily%2Fg2gflow-data%2F{year}"
+    "https://nextcloud.eatlas.org.au/public.php/dav/files/LiRXpzLFBCWPf4f/daily/g2gflow-data/{year}/?accept=zip"
 )
 EXCLUDED_YEARS = {}
 
